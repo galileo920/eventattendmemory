@@ -340,8 +340,8 @@ function parseJsonObject(text){
   if(!m) throw Object.assign(new Error("読み取り結果を解析できませんでした"), {code: "invalid_json"});
   try { return JSON.parse(m[0]); } catch(e){ throw Object.assign(new Error("読み取り結果を解析できませんでした"), {code: "invalid_json"}); }
 }
-async function extractFromImage(dataUrl){
-  const prompt = `この画像はライブ・コンサートなどのイベントの紙のチケット、電子チケット(チケットぴあ・イープラス・ローチケ等のアプリ画面のスクリーンショット)、フライヤー、ポスター、または予約画面です。購入者の名前は含めないでください。複数日にまたがる券の場合、dateは初日にしてください。読み取れる情報を次のJSONだけで返してください(説明文やコードブロックは不要)。読み取れない項目は空文字にしてください。推測で埋めないでください。
+async function extractFromImage(dataUrls, signal){
+  const prompt = `この画像はライブ・コンサートなどのイベントの紙のチケット、電子チケット(チケットぴあ・イープラス・ローチケ等のアプリ画面のスクリーンショット)、フライヤー、ポスター、または予約画面です。複数枚ある場合は同じ公演の情報として1件にまとめてください。購入者の名前は含めないでください。複数日にまたがる券の場合、dateは初日にしてください。読み取れる情報を次のJSONだけで返してください(説明文やコードブロックは不要)。読み取れない項目は空文字にしてください。推測で埋めないでください。
 {
  "genre":"ジャンル(音楽・舞台・お笑い・スポーツ・トーク・展示会・その他のいずれか。どれにも当てはまらない場合は「その他」、判断できなければ空文字)",
  "title":"公演名・イベント名・ツアー名",
@@ -355,7 +355,7 @@ async function extractFromImage(dataUrl){
  "seat":"座席・整理番号(例: 11列40番、整理番号C 266番)",
  "price":"チケット代(数字のみ)"
 }`;
-  return parseJsonObject(await geminiText(prompt, [dataUrl]));
+  return parseJsonObject(await geminiText(prompt, Array.isArray(dataUrls) ? dataUrls : [dataUrls], signal));
 }
 
 /* ========== 画面 ========== */
@@ -579,7 +579,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020B</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020C</div>
   `;
   $("#saveSet").onclick = () => {
     setSet({apiKey: $("#key").value.trim(), model: $("#model").value.trim() || DEFAULT_MODEL});
@@ -788,11 +788,12 @@ function openForm(existing){
       <h2>画像から自動入力</h2>
       <div class="scan">
         <label class="btn sec">撮影<input id="cam" type="file" accept="image/*" capture="environment"></label>
-        <label class="btn sec">写真を選ぶ<input id="pick" type="file" accept="image/*"></label>
+        <label class="btn sec">写真を選ぶ<input id="pick" type="file" accept="image/*" multiple></label>
       </div>
       <img id="pv" class="preview" style="display:none">
+      <button type="button" class="btn sec" id="stop" hidden>読み取りを中止</button>
       <div id="st" class="status"></div>
-      <div class="hint">チケット・フライヤー・予約画面のスクリーンショットなど。読み取り結果は下のフォームに入るので、確認・修正してから保存してください。</div>
+      <div class="hint">チケット・フライヤー・予約画面のスクリーンショットなど。チケット画面と詳細画面を一緒に選ぶと(4枚まで)、1件にまとめて読み取ります。読み取り結果は下のフォームに入るので、確認・修正してから保存してください。</div>
     </div>
     <div class="card">
       <label>公演名</label><div class="cw"><textarea id="f_title" placeholder=" " style="min-height:110px">${v("title")}</textarea><button type="button" class="cx" data-clr="f_title" aria-label="クリア">×</button></div>
@@ -936,24 +937,30 @@ ${RULES}`;
 
   if(l.photo){ const pv = $("#pv"); pv.src = l.photo; pv.style.display = "block"; }
 
+  let scanCtl = null;
   const handle = async e => {
-    const file = e.target.files[0];
-    if(!file) return;
-    const st = $("#st");
-    st.className = "status"; st.textContent = "読み取り中…";
+    const all = [...e.target.files];
+    e.target.value = "";
+    if(!all.length) return;
+    const files = all.slice(0, 4), st = $("#st"), stop = $("#stop");
+    scanCtl = new AbortController();
+    st.className = "status"; st.textContent = "読み取り中…(数十秒かかることがあります)";
+    stop.hidden = false;
     try {
-      const big = await resizeImage(file, 1600, 0.85);
-      const small = await resizeImage(file, 600, 0.7);
+      const bigs = [];
+      for(const f of files) bigs.push(await resizeImage(f, 1600, 0.85));
+      const small = await resizeImage(files[0], 600, 0.7);
       l.photo = small;
       const pv = $("#pv"); pv.src = small; pv.style.display = "block";
-      const r = await extractFromImage(big);
+      const r = await extractFromImage(bigs, scanCtl.signal);
       applyResult(r);
-      st.className = "status ok"; st.textContent = "読み取り完了。内容を確認してください。";
+      st.className = "status ok"; st.textContent = "読み取り完了。内容を確認してください。" + (all.length > 4 ? "(5枚目以降は読み取っていません)" : "");
     } catch(err){
-      st.className = "status err"; st.textContent = err.message;
-    }
-    e.target.value = "";
+      if(err && err.name === "AbortError") st.textContent = "";
+      else { st.className = "status err"; st.textContent = err.message; }
+    } finally { stop.hidden = true; scanCtl = null; }
   };
+  $("#stop").onclick = () => scanCtl && scanCtl.abort();
   $("#cam").onchange = handle;
   $("#pick").onchange = handle;
 
