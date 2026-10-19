@@ -579,7 +579,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020D</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020E</div>
   `;
   $("#saveSet").onclick = () => {
     setSet({apiKey: $("#key").value.trim(), model: $("#model").value.trim() || DEFAULT_MODEL});
@@ -768,10 +768,11 @@ function showSugg(input, cands, onPick){
 }
 const hideSugg = () => document.querySelectorAll(".sugg").forEach(e => e.remove());
 const readArtists = () => [...document.querySelectorAll(".f_artist")].map(i => i.value.trim());
+const readRows = () => [...document.querySelectorAll("#artists .prow")].map(r => ({name: r.querySelector(".f_artist").value.trim(), role: r.dataset.role || ""}));
 function artistRows(list){
-  const arr = (list.length ? list : [""]).map(x => typeof x === "string" ? {name: x} : x);
-  $("#artists").innerHTML = arr.map((a, i) => `<div class="prow"><div class="cw" style="flex:1;min-width:0"><input class="f_artist" id="f_artist_${i}" aria-label="出演者${i + 1}" value="${esc(a.name)}" placeholder=" "><button type="button" class="cx" data-clr="f_artist_${i}" aria-label="クリア">×</button></div>${arr.length > 1 ? `<button type="button" class="grip" aria-label="出演者${i + 1}を並べ替え(押したまま上下に動かす)">≡</button><button type="button" class="rm" aria-label="出演者${i + 1}を削除">×</button>` : ""}</div>`).join("");
-  document.querySelectorAll("#artists .rm").forEach(b => b.onclick = () => { const cur = readArtists(); cur.splice([...document.querySelectorAll("#artists .rm")].indexOf(b), 1); artistRows(cur); });
+  const arr = (list.length ? list : [""]).map(x => typeof x === "string" ? {name: x, role: ""} : x);
+  $("#artists").innerHTML = arr.map((a, i) => `<div class="prow" data-role="${esc(a.role || "")}"><div class="cw" style="flex:1;min-width:0"><input class="f_artist" id="f_artist_${i}" aria-label="出演者${i + 1}" value="${esc(a.name)}" placeholder=" "><button type="button" class="cx" data-clr="f_artist_${i}" aria-label="クリア">×</button></div>${arr.length > 1 ? `<button type="button" class="grip" aria-label="出演者${i + 1}を並べ替え(押したまま上下に動かす)">≡</button><button type="button" class="rm" aria-label="出演者${i + 1}を削除">×</button>` : ""}</div>`).join("");
+  document.querySelectorAll("#artists .rm").forEach(b => b.onclick = () => { const cur = readRows(); cur.splice([...document.querySelectorAll("#artists .rm")].indexOf(b), 1); artistRows(cur); });
   document.querySelectorAll("#artists .grip").forEach(g => {
     g.onpointerdown = ev => { if(ev.pointerType === "touch") return; ev.preventDefault(); dragArtist(ev, g, false); };
     g.addEventListener("touchstart", ev => { if(!ev.touches.length) return; ev.preventDefault(); dragArtist(ev.touches[0], g, true); }, {passive: false});
@@ -808,7 +809,7 @@ function dragArtist(ev, grip, isTouch){
     clearInterval(tick);
     if(isTouch){ grip.removeEventListener("touchmove", move); grip.removeEventListener("touchend", end); grip.removeEventListener("touchcancel", end); }
     else { grip.removeEventListener("pointermove", move); grip.removeEventListener("pointerup", end); grip.removeEventListener("pointercancel", end); }
-    const list = readArtists(); const [m] = list.splice(from, 1); list.splice(to, 0, m);
+    const list = readRows(); const [m] = list.splice(from, 1); list.splice(to, 0, m);
     artistRows(list);
   };
   if(isTouch){ grip.addEventListener("touchmove", move, {passive: false}); grip.addEventListener("touchend", end); grip.addEventListener("touchcancel", end); }
@@ -868,7 +869,7 @@ function openForm(existing){
     <button class="btn sec" id="cancel">キャンセル</button>
     ${existing ? `<button class="btn danger" id="del">削除</button>` : ""}
   `;
-  artistRows(splitArtists(l.artist));
+  artistRows(splitArtists(l.artist).map(n => ({name: n, role: (l.artistRoles || {})[n] || ""})));
   const fillPref = v => { const sel = $("#f_pref"); if(!sel || sel.value) return; const k = lives.find(z => z.venue === v && z.pref); if(k) sel.value = k.pref; };
   $("#f_venue").addEventListener("change", e => fillPref(e.target.value.trim()));
   $("#f_venue").addEventListener("input", e => showSugg(e.target, regCands("venue", e.target.value), c => { e.target.value = c.name; if(c.pref){ const sel = $("#f_pref"); if(sel && !sel.value) sel.value = c.pref; } }));
@@ -881,15 +882,15 @@ function openForm(existing){
     const hasKey = !!getSet().apiKey;
     btn.disabled = true; sst.className = "status"; sst.textContent = hasKey ? "読みを調べて並べ替えています…" : "並べ替えています…";
     try {
-      const r = await sortRowsAsync(readArtists().filter(Boolean).map(name => ({name})));
-      artistRows(r.rows.map(x => x.name));
+      const r = await sortRowsAsync(readRows());
+      artistRows(r.rows);
       if(!hasKey && r.missing){ sst.className = "status err"; sst.textContent = `APIキーが未入力のため、読みが分からない${r.missing}件は、記号→数字→英字→日本語の順で最後にまとめました。データタブでキーを入力すると、五十音順に並べ替えられます。`; }
       else if(r.ok && !r.missing){ sst.className = "status ok"; sst.textContent = "読み順に並べ替えました。"; }
       else { sst.className = "status err"; sst.textContent = `読みが分からない${r.missing}件は、記号→数字→英字→日本語の順で最後にまとめました。`; }
     } catch(err){ sst.className = "status err"; sst.textContent = "並べ替えに失敗しました。"; }
     btn.disabled = false;
   };
-  $("#addArtist").onclick = () => { const cur = readArtists(); cur.push(""); artistRows(cur); const ins = document.querySelectorAll(".f_artist"); ins[ins.length - 1].focus(); };
+  $("#addArtist").onclick = () => { const cur = readRows(); cur.push({name: "", role: ""}); artistRows(cur); const ins = document.querySelectorAll(".f_artist"); ins[ins.length - 1].focus(); };
   if(existing) $("#del").onclick = async () => {
     if(!confirm("この記録を削除しますか?")) return;
     await dbDel(existing.id); await refresh(); setTab("list");
@@ -921,8 +922,8 @@ function openForm(existing){
     resBox.innerHTML = `<div class="card" style="margin-top:10px"><b>候補</b><div class="hint">取得した候補です。内容を確認し、追加するものにチェックしてください。</div>${all.map((x, i) => `<label style="display:flex;gap:10px;align-items:center;margin-top:8px"><input type="checkbox" class="cand" data-i="${i}" style="width:auto;margin:0" checked><span>${esc(x.name)}${x.role ? ` <small style="color:var(--sub)">(${esc(x.role)})</small>` : ""}</span></label>`).join("")}<button type="button" class="btn sec" id="candAdd">チェックした人を入力欄に追加</button></div>`;
     $("#candAdd").onclick = () => {
       const picks = [...document.querySelectorAll(".cand")].filter(c => c.checked).map(c => all[Number(c.dataset.i)]).filter(Boolean);
-      const cur = readArtists().filter(Boolean);
-      picks.forEach(x => { if(!cur.includes(x.name)) cur.push(x.name); });
+      const cur = readRows().filter(r => r.name);
+      picks.forEach(x => { const f = cur.find(r => r.name === x.name); if(f){ if(x.role && !f.role) f.role = x.role; } else cur.push({name: x.name, role: x.role || ""}); });
       artistRows(cur); resBox.innerHTML = "";
       sst.className = "status ok"; sst.textContent = `${picks.length}件を入力欄に追加しました。保存すると反映されます。`;
     };
@@ -1017,6 +1018,7 @@ ${RULES}`;
     l.genre = $("#f_genre").value || "音楽";
     l.title = l.title.replace(/\s*\n\s*/g, " ");
     l.artist = readArtists().filter(Boolean).join("、");
+    { const rr = {}; readRows().forEach(r => { if(r.name && r.role) rr[r.name] = r.role; }); l.artistRoles = rr; }
     if(!l.artist && !l.title){ alert("公演名か出演者を入力してください"); return; }
     l.price = l.price === "" ? "" : Number(l.price);
     l.updatedAt = Date.now();
@@ -1252,7 +1254,7 @@ async function bRegister(){
   let n = 0, fail = 0;
   for(const it of targets){
     const f = it.f, now = Date.now();
-    const rec = {id: uid(), genre: GENRES.includes(f.genre) ? f.genre : "音楽", title: f.title, artist: f.artist, venue: f.venue, pref: f.pref, date: f.date, open: f.open, start: f.start, seatType: f.seatType, seat: f.seat, price: f.price === "" ? "" : Number(f.price), setlist: "", createdAt: now, updatedAt: now};
+    const rec = {id: uid(), genre: GENRES.includes(f.genre) ? f.genre : "音楽", title: f.title, artist: f.artist, venue: f.venue, pref: f.pref, date: f.date, open: f.open, start: f.start, seatType: f.seatType, seat: f.seat, price: f.price === "" ? "" : Number(f.price), setlist: "", artistRoles: {}, createdAt: now, updatedAt: now};
     if(it.photo) rec.photo = it.photo;
     if(!rec.artist && !rec.title){ fail++; it.err = "公演名か出演者を入力してください。"; it.open = true; continue; }
     try { await dbPut(rec); n++; bItems = bItems.filter(x => x !== it); if(bMedia[it.id]){ URL.revokeObjectURL(bMedia[it.id].url); delete bMedia[it.id]; } }
