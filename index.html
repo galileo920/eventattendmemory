@@ -581,7 +581,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020K</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020L</div>
   `;
   $("#saveSet").onclick = () => {
     setSet({apiKey: $("#key").value.trim(), model: $("#model").value.trim() || DEFAULT_MODEL});
@@ -686,8 +686,7 @@ function openDetail(id){
     ${row("ジャンル", genreOf(l))}
     ${(() => { const t = String(l.setlist || "").trim(); return t ? `<div class="field"><small>詳細</small><div>${linkify(t)}</div></div>` : ""; })()}
     ${l.photo ? `<img class="thumb" src="${l.photo}">` : ""}
-    <button class="btn" id="edit">編集</button>
-    <button class="btn sec" id="back">戻る</button>
+    <div class="bend"><button class="btn sec" id="back">戻る</button><button class="btn" id="edit">編集</button></div>
   `;
   $("#back").onclick = () => setTab("list");
   $("#edit").onclick = () => openForm(l);
