@@ -579,7 +579,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020E</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020F</div>
   `;
   $("#saveSet").onclick = () => {
     setSet({apiKey: $("#key").value.trim(), model: $("#model").value.trim() || DEFAULT_MODEL});
@@ -841,6 +841,10 @@ function openForm(existing){
       <button type="button" class="btn sec" id="addArtist" style="margin-top:8px">＋ 出演者を追加</button>
       <button type="button" class="btn sec" id="sortArtist">出演者を読み順に並べ替える</button>
       <div class="status" id="stSort"></div>
+      <label for="artIn">出演者をまとめて追加</label>
+      <div class="cw"><textarea id="artIn" style="min-height:72px" placeholder="名前を「、」「,」や改行で区切って入力。JSONの貼り付けもできます"></textarea><button type="button" class="cx" data-clr="artIn" aria-label="クリア">×</button></div>
+      <button type="button" class="btn sec" id="artApply">入力欄に追加</button>
+      <div class="status" id="stApply"></div>
       <div id="artFetch">${getSet().apiKey ? `
         <button type="button" class="btn sec" id="artSearch">出演者を検索して候補を出す</button>
         <div class="status" id="stSearch"></div>
@@ -854,6 +858,7 @@ function openForm(existing){
         <div id="artRes"></div>` : `<div class="hint">出演者を検索・取得するには、データタブでGeminiのAPIキーを入力してください。</div>`}</div>
       <label>会場</label><div class="cw"><input id="f_venue" placeholder=" " value="${v("venue")}"><button type="button" class="cx" data-clr="f_venue" aria-label="クリア">×</button></div>
       <label>会場(都道府県)</label><div class="cw"><select id="f_pref"><option value="">未選択</option>${PREFS.map(x => `<option value="${x}"${l.pref === x ? " selected" : ""}>${x}</option>`).join("")}</select></div>
+      <div class="status" id="stPref"></div>
       <div class="row3">
         <div><label>日付</label><input id="f_date" type="date" value="${v("date")}"></div>
         <div><label>開場</label><input id="f_open" type="time" value="${v("open")}"></div>
@@ -870,9 +875,53 @@ function openForm(existing){
     ${existing ? `<button class="btn danger" id="del">削除</button>` : ""}
   `;
   artistRows(splitArtists(l.artist).map(n => ({name: n, role: (l.artistRoles || {})[n] || ""})));
-  const fillPref = v => { const sel = $("#f_pref"); if(!sel || sel.value) return; const k = lives.find(z => z.venue === v && z.pref); if(k) sel.value = k.pref; };
-  $("#f_venue").addEventListener("change", e => fillPref(e.target.value.trim()));
-  $("#f_venue").addEventListener("input", e => showSugg(e.target, regCands("venue", e.target.value), c => { e.target.value = c.name; if(c.pref){ const sel = $("#f_pref"); if(sel && !sel.value) sel.value = c.pref; } }));
+  /* 会場名から都道府県を決める: 登録済みの記録 → Geminiで推定(未選択のときだけ) */
+  let prefSeq = 0;
+  const inferPref = async () => {
+    const venueEl = $("#f_venue"), sel = $("#f_pref"), sst = $("#stPref");
+    if(!venueEl || !sel || !sst || sel.value) return;
+    const venue = venueEl.value.trim();
+    if(!venue) return;
+    const known = lives.find(z => z.venue === venue && z.pref);
+    if(known){ sel.value = known.pref; sst.className = "status ok"; sst.textContent = `登録済みの記録から「${known.pref}」を入れました。違う場合は選び直してください。`; return; }
+    if(!getSet().apiKey) return;
+    const my = ++prefSeq, title = $("#f_title") ? $("#f_title").value.trim().replace(/\s*\n\s*/g, " ") : "";
+    sst.className = "status"; sst.textContent = "都道府県を調べています…";
+    try {
+      const j = parseJsonObject(await geminiText(`イベント会場「${venue}」${title ? `(公演名「${title.slice(0, 60)}」)` : ""}がある都道府県を答えてください。知識で確実に分かる場合のみ答え、同じ名前の会場が複数ある・オンライン・分からないときは空文字にします。次のJSONだけを返す: {"pref":"東京都"}`, []));
+      if(my !== prefSeq || venueEl.value.trim() !== venue || sel.value) return;
+      const pf = normPref(j && j.pref);
+      if(pf){ sel.value = pf; sst.className = "status ok"; sst.textContent = `会場名から「${pf}」を入れました。違う場合は選び直してください。`; }
+      else { sst.className = "status"; sst.textContent = "都道府県を特定できませんでした。選んでください。"; }
+    } catch(e){ sst.className = "status"; sst.textContent = ""; }
+  };
+  window.__inferPref = inferPref;
+  $("#f_venue").addEventListener("change", inferPref);
+  $("#f_venue").addEventListener("input", e => showSugg(e.target, regCands("venue", e.target.value), c => { e.target.value = c.name; if(c.pref){ const sel = $("#f_pref"); if(sel && !sel.value){ sel.value = c.pref; const sst = $("#stPref"); sst.className = "status ok"; sst.textContent = `登録済みの記録から「${c.pref}」を入れました。違う場合は選び直してください。`; } } else inferPref(); }));
+  const parseArtists = raw => {
+    let t = String(raw || "").trim();
+    if(!t) return [];
+    const m = t.match(/[\[{][\s\S]*[\]}]/);
+    if(m && /^(```|\[|\{)/.test(t)){
+      try {
+        const j = JSON.parse(m[0]);
+        const a = Array.isArray(j) ? j : (j && j.artist);
+        t = Array.isArray(a) ? a.map(x => typeof x === "string" ? x : (x && x.name) || "").join("、") : String(a || "");
+      } catch(e){ throw new Error("json"); }
+    }
+    return t.split(/[、,，\n]/).map(x => x.trim()).filter(Boolean);
+  };
+  $("#artApply").onclick = () => {
+    const sa = $("#stApply"); let add;
+    try { add = parseArtists($("#artIn").value); } catch(err){ sa.className = "status err"; sa.textContent = "JSONを読み取れませんでした。内容を確認してください。"; return; }
+    if(!add.length){ sa.className = "status err"; sa.textContent = "出演者を入力してください。"; return; }
+    const cur = readRows().filter(r => r.name);
+    let cnt = 0;
+    add.forEach(n => { if(!cur.some(r => r.name === n)){ cur.push({name: n, role: ""}); cnt++; } });
+    artistRows(cur);
+    $("#artIn").value = "";
+    sa.className = "status ok"; sa.textContent = `${cnt}件を入力欄に追加しました。保存すると反映されます。`;
+  };
   $("#f_venue").addEventListener("blur", () => setTimeout(hideSugg, 200));
   $("#artists").addEventListener("input", e => { const t = e.target; if(!t.classList.contains("f_artist")) return; showSugg(t, regCands("artist", t.value, readArtists().filter((n, i) => n && t !== document.querySelectorAll(".f_artist")[i])), c => { t.value = c.name; }); });
   $("#artists").addEventListener("focusout", () => setTimeout(hideSugg, 200));
@@ -1002,6 +1051,7 @@ ${RULES}`;
       const pv = $("#pv"); pv.src = small; pv.style.display = "block";
       const r = await extractFromImage(bigs, scanCtl.signal);
       applyResult(r);
+      if(window.__inferPref) window.__inferPref();
       st.className = "status ok"; st.textContent = "読み取り完了。内容を確認してください。" + (all.length > 4 ? "(5枚目以降は読み取っていません)" : "");
     } catch(err){
       if(err && err.name === "AbortError") st.textContent = "";
