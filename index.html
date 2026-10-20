@@ -587,7 +587,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020O</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020P</div>
   `;
   $("#saveSet").onclick = () => {
     setSet({apiKey: $("#key").value.trim(), model: $("#model").value.trim() || DEFAULT_MODEL});
@@ -1090,7 +1090,6 @@ ${RULES}`;
     try {
       const bigs = [];
       for(const f of files) bigs.push(await resizeImage(f, 1600, 0.85));
-      l.photo = await resizeImage(files[0], 600, 0.7);
       const r = await extractFromImage(bigs, scanCtl.signal);
       applyResult(r);
       if(window.__inferPref) window.__inferPref();
@@ -1308,7 +1307,6 @@ async function bReadOne(it){
   const m = bMedia[it.id];
   const big = await resizeImage(m.blob, 1600, 0.85);
   const text = await geminiText(BPROMPT(), [big], bCtl.signal);
-  it.photo = await resizeImage(m.blob, 600, 0.7).catch(() => "");
   const r = parseJsonObject(text);
   return bNormalize(r && typeof r === "object" ? r : {});
 }
@@ -1349,7 +1347,6 @@ async function bRegister(){
   for(const it of targets){
     const f = it.f, now = Date.now();
     const rec = {id: uid(), genre: GENRES.includes(f.genre) ? f.genre : "音楽", title: f.title, artist: f.artist, venue: f.venue, pref: f.pref, date: f.date, open: f.open, start: f.start, seatType: f.seatType, seat: f.seat, price: f.price === "" ? "" : Number(f.price), setlist: "", artistRoles: {}, createdAt: now, updatedAt: now};
-    if(it.photo) rec.photo = it.photo;
     if(!rec.artist && !rec.title){ fail++; it.err = "公演名か出演者を入力してください。"; it.open = true; continue; }
     try { await dbPut(rec); n++; bItems = bItems.filter(x => x !== it); if(bMedia[it.id]){ URL.revokeObjectURL(bMedia[it.id].url); delete bMedia[it.id]; } }
     catch(e){ fail++; it.err = "登録できませんでした。"; it.open = true; }
@@ -1364,6 +1361,14 @@ async function bRegister(){
 (async () => {
   try { if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch(e){}
   await refresh();
+  /* 保存済みの読み取り画像を一度だけすべて削除する(詳細画面の表示エリアは残してある) */
+  try {
+    if(!localStorage.getItem("livelog_photo_purged_v1")){
+      for(const x of lives){ if("photo" in x){ const y = {...x}; delete y.photo; await dbPut(y); } }
+      localStorage.setItem("livelog_photo_purged_v1", "1");
+      await refresh();
+    }
+  } catch(e){}
   setTab("list");
 })();
 </script>
