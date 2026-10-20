@@ -570,7 +570,7 @@ function renderSettings(){
       <label>モデル</label>
       <input id="model" value="${esc(s.model || DEFAULT_MODEL)}">
       <div class="hint">キーはこの端末のブラウザ内にだけ保存され、画像の読み取り時にGoogle Gemini APIへ直接送信されます。</div>
-      <button class="btn" id="saveSet">保存</button>
+      <div class="bend"><a class="btn sec" id="keyLink" href="https://aistudio.google.com/api-keys" target="_blank" rel="noopener noreferrer" style="text-decoration:none">APIキーを確認</a><button class="btn" id="saveSet">保存</button></div>
     </div>
     <div class="card">
       <h2>バックアップ</h2>
@@ -587,7 +587,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020N</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020O</div>
   `;
   $("#saveSet").onclick = () => {
     setSet({apiKey: $("#key").value.trim(), model: $("#model").value.trim() || DEFAULT_MODEL});
