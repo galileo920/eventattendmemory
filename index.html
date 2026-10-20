@@ -569,7 +569,7 @@ function renderSettings(){
     <div class="card">
       <h2>バックアップ</h2>
       <div class="hint">iOSはブラウザのデータが消えることがあります。定期的に書き出して、ファイルAppやiCloud Driveに保存してください。</div>
-      <label class="btn sec" style="text-align:center">JSONを読み込む(追加・上書き)
+      <label class="btn sec" style="text-align:center">JSONを読み込む
         <input id="import" type="file" accept="application/json,.json" style="display:none">
       </label>
       <button class="btn sec" id="export">JSONを書き出す</button>
@@ -581,7 +581,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020H</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020I</div>
   `;
   $("#saveSet").onclick = () => {
     setSet({apiKey: $("#key").value.trim(), model: $("#model").value.trim() || DEFAULT_MODEL});
@@ -590,7 +590,8 @@ function renderSettings(){
   if(dataMsg){ const d = $(dataMsg.id || "#dst"); d.className = "status " + dataMsg.cls; d.textContent = dataMsg.text; }
   $("#export").onclick = exportJSON;
   $("#csv").onclick = exportCSV;
-  $("#import").onchange = importJSON;
+  $("#import").addEventListener("change", importJSON);
+  $("#import").addEventListener("input", importJSON);
   $("#wipe").onclick = async () => {
     if(!confirm("全ての記録を削除します。元に戻せません。よろしいですか?")) return;
     await dbClear(); await refresh(); render(); setDataMsg("ok", "全データを削除しました。", "#wst");
@@ -612,29 +613,47 @@ async function shareOrDownload(blob, name){
 }
 function stamp(){ return new Date().toISOString().slice(0, 10); }
 async function exportJSON(){
-  const blob = new Blob([JSON.stringify({version: 1, lives}, null, 1)], {type: "application/json"});
-  if(await shareOrDownload(blob, `livelog-${stamp()}.json`)) setDataMsg("ok", `${lives.length}件をJSONで書き出しました。`);
+  const blob = new Blob([JSON.stringify({version: 2, lives}, null, 1)], {type: "application/json"});
+  if(await shareOrDownload(blob, `livelog-${stamp()}.json`)) setDataMsg("ok", "保存しました。");
 }
 async function exportCSV(){
-  const cols = ["date","genre","title","artist","venue","pref","open","start","seatType","seat","price","setlist"];
+  const cols = FIELDS;
   const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const rows = [cols.join(",")].concat(lives.slice().sort((a, b) => (a.date || "").localeCompare(b.date || "")).map(l => cols.map(c => q(c === "genre" ? genreOf(l) : l[c])).join(",")));
   const blob = new Blob(["\ufeff" + rows.join("\r\n")], {type: "text/csv"});
-  if(await shareOrDownload(blob, `livelog-${stamp()}.csv`)) setDataMsg("ok", `${lives.length}件をCSVで書き出しました。`);
+  if(await shareOrDownload(blob, `livelog-${stamp()}.csv`)) setDataMsg("ok", "保存しました。");
 }
 async function importJSON(e){
-  const f = e.target.files[0];
-  if(!f) return;
+  const f = e.target.files && e.target.files[0];
+  if(!f || importBusy) return;
+  importBusy = true;
+  setDataMsg("", `「${f.name}」を読み込んでいます…`);
   try {
-    const j = JSON.parse(await f.text());
-    const arr = Array.isArray(j) ? j : j.lives;
-    if(!Array.isArray(arr)) throw new Error("形式が正しくありません");
-    for(const l of arr){ if(l && l.id) await dbPut(l); }
+    let text = "";
+    try { text = await f.text(); } catch(e1){ throw new Error("ファイルを読み取れませんでした"); }
+    let j;
+    try { j = JSON.parse(text.replace(/^\uFEFF/, "")); } catch(e2){ throw new Error("JSONとして読み取れませんでした(書き出したJSONファイルを選んでください)"); }
+    const arr = Array.isArray(j) ? j : j && j.lives;
+    if(!Array.isArray(arr)) throw new Error("記録のデータが見つかりませんでした");
+    let n = 0;
+    for(const r of arr){
+      if(!r || typeof r !== "object") continue;
+      const o = {id: String(r.id || uid()).replace(/[^A-Za-z0-9_\-.~:@+]/g, "_"), createdAt: Number(r.createdAt) || Date.now(), updatedAt: Date.now()};
+      FIELDS.forEach(k => { o[k] = r[k] ?? ""; });
+      if(r.artistRoles && typeof r.artistRoles === "object" && !Array.isArray(r.artistRoles)) o.artistRoles = r.artistRoles;
+      o.pref = normPref(o.pref);
+      o.genre = o.genre === "ライブ" ? "音楽" : o.genre === "演劇" ? "舞台" : GENRES.includes(o.genre) ? o.genre : "音楽";
+      const p = Number(String(o.price).replace(/[^\d]/g, ""));
+      o.price = o.price === "" ? "" : (p || "");
+      await dbPut(o); n++;
+    }
     await refresh(); render();
-    setDataMsg("ok", `${arr.length}件を読み込みました。`);
-  } catch(err){ setDataMsg("err", "読み込めませんでした。ファイルを確認してください。"); }
+    setDataMsg("ok", `${n}件を読み込みました。`);
+  } catch(err){ setDataMsg("err", "読み込めませんでした。" + ((err && err.message && !/^(Failed|Unexpected|Cannot)/.test(err.message)) ? err.message : "ファイルを確認してください。")); }
   e.target.value = "";
+  importBusy = false;
 }
+let importBusy = false;
 
 /* ========== 詳細 ========== */
 /* 文章の中の http(s) のURLをすべてリンクにする(それ以外の文字はそのまま) */
