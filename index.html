@@ -581,7 +581,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020I</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020J</div>
   `;
   $("#saveSet").onclick = () => {
     setSet({apiKey: $("#key").value.trim(), model: $("#model").value.trim() || DEFAULT_MODEL});
@@ -668,6 +668,7 @@ function openDetail(id){
   closeDial();
   const l = lives.find(x => x.id === id);
   if(!l) return;
+  document.querySelector(".tabbar").hidden = false;
   saveScroll(); sub = true; subKind = "detail";
   window.scrollTo(0, 0);
   $("#fab").style.display = "";
@@ -842,7 +843,7 @@ function openForm(existing){
   saveScroll(); sub = true; subKind = "form"; subEdit = !!existing; subBack = () => existing ? openDetail(existing.id) : setTab("list");
   window.scrollTo(0, 0);
   const l = existing ? {...existing} : {id: uid(), createdAt: Date.now()};
-  $("#fab").style.display = "none";
+  $("#fab").style.display = "none"; document.querySelector(".tabbar").hidden = true;
   const v = k => esc(l[k] ?? "");
   $("#app").innerHTML = `
     <div class="card" style="margin-top:12px">
@@ -891,9 +892,8 @@ function openForm(existing){
       <label>ジャンル</label><select id="f_genre">${GENRES.map(g => `<option${genreOf(l) === g ? " selected" : ""}>${g}</option>`).join("")}</select>
       <div class="lh"><label>詳細</label></div><div class="cw"><textarea id="f_setlist" inputmode="url" autocapitalize="off" autocomplete="off" placeholder="URLを入力(複数のときは改行で区切る)" style="min-height:96px">${v("setlist")}</textarea><button type="button" class="cx" data-clr="f_setlist" aria-label="クリア">×</button></div>
     </div>
-    <button class="btn" id="save">保存</button>
-    <button class="btn sec" id="cancel">キャンセル</button>
     ${existing ? `<button class="btn danger" id="del">削除</button>` : ""}
+    <div class="bbar"><div class="bbar-in"><button class="btn" id="save">保存</button><button class="btn sec" id="cancel">キャンセル</button></div></div>
   `;
   artistRows(splitArtists(l.artist).map(n => ({name: n, role: (l.artistRoles || {})[n] || ""})));
   /* 会場名から都道府県を決める: 登録済みの記録 → Geminiで推定(未選択のときだけ) */
@@ -1203,9 +1203,9 @@ function renderBatch(){
     <input id="bCam" type="file" accept="image/*" capture="environment" style="display:none">
     <p class="bhint">写真1枚を1公演として読み取ります。チケットの写真や電子チケットのスクリーンショットを、まとめて選べます。</p>
     <div id="bList"></div>
-    <div class="bend"><button type="button" class="btn sec" id="bCancel">キャンセル</button><button type="button" class="btn sec" id="bDone">完了</button></div>
+    <div class="bend"><button type="button" class="btn" id="bRun" disabled>読み取る</button><button type="button" class="btn" id="bReg" disabled>登録する</button></div>
     <p class="bnote" id="bNote" role="status"></p>
-    <div class="bbar"><div class="bbar-in"><button type="button" class="btn" id="bRun" disabled>読み取る</button><button type="button" class="btn" id="bReg" disabled>登録する</button></div></div>`;
+    <div class="bbar"><div class="bbar-in"><button type="button" class="btn sec" id="bCancel">キャンセル</button><button type="button" class="btn sec" id="bDone">完了</button></div></div>`;
   bRefresh();
   if(bNoteState) bSetNote(bNoteState.cls, bNoteState.text);
   if(!getSet().apiKey) bSetNote("err", "画像を読み取るには、データタブでGeminiのAPIキーを入力してください。");
