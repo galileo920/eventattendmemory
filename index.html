@@ -129,6 +129,12 @@ button.line{width:100%;text-align:left;cursor:pointer}
 .hint{font-size:12px;color:var(--sub);margin-top:6px}
 .status{margin-top:10px;font-size:14px}
 .status.ok{color:var(--ok)}.status.err{color:var(--danger)}
+.thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.thumbs:empty{display:none}
+.sthumb{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--bg)}
+.sthumb img{width:100%;height:100%;object-fit:cover;display:block}
+.sthumb button{position:absolute;top:3px;right:3px;width:24px;height:24px;border:0;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:15px;line-height:1;padding:0 0 2px;cursor:pointer}
+.scan .btn.dis{opacity:.45;pointer-events:none}
 .scan{display:flex;gap:10px;margin-top:10px}
 .scan .btn{margin-top:0}
 .stats{display:flex;gap:10px;margin-bottom:12px}
@@ -172,7 +178,7 @@ select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:1
 .dial{position:fixed;inset:0;z-index:8}
 .dial-scrim{position:absolute;inset:0;background:rgba(15,17,24,.45)}
 .dial-items{position:absolute;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(132px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;align-items:flex-end;gap:12px}
-.dial-btn{display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-weight:700;border-radius:999px;padding:12px 18px 12px 14px;box-shadow:0 4px 14px rgba(0,0,0,.28);cursor:pointer}
+.dial-btn{display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-weight:700;border-radius:999px;padding:12px 18px;box-shadow:0 4px 14px rgba(0,0,0,.28);cursor:pointer}
 .dial-btn svg{width:22px;height:22px;color:var(--accent)}
 .fab.open{z-index:9}
 .fab svg{transition:transform .18s}
@@ -219,8 +225,8 @@ select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:1
 <div class="dial" id="dial" hidden>
   <div class="dial-scrim" id="dialScrim"></div>
   <div class="dial-items">
-    <button type="button" class="dial-btn" id="dialManual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>登録</button>
-    <button type="button" class="dial-btn" id="dialPhoto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>一括登録</button>
+    <button type="button" class="dial-btn" id="dialManual">新規登録</button>
+    <button type="button" class="dial-btn" id="dialPhoto">一括登録</button>
   </div>
 </div>
 <button class="fab" id="fab" aria-label="イベントを追加"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg></button>
@@ -581,7 +587,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020L</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020M</div>
   `;
   $("#saveSet").onclick = () => {
     setSet({apiKey: $("#key").value.trim(), model: $("#model").value.trim() || DEFAULT_MODEL});
@@ -851,7 +857,9 @@ function openForm(existing){
         <label class="btn sec">撮影<input id="cam" type="file" accept="image/*" capture="environment"></label>
         <label class="btn sec">写真を選ぶ<input id="pick" type="file" accept="image/*" multiple></label>
       </div>
+      <div class="thumbs" id="thumbs"></div>
       <img id="pv" class="preview" style="display:none">
+      <button type="button" class="btn" id="readGo" disabled>読み取る</button>
       <button type="button" class="btn sec" id="stop" hidden>読み取りを中止</button>
       <div id="st" class="status"></div>
       <div class="hint">チケットの写真や電子チケットのスクリーンショットを読み取ります。チケット画面と詳細画面を一緒に選ぶと、1件にまとめて読み取ります。</div>
@@ -1043,32 +1051,53 @@ ${RULES}`;
   if(l.photo){ const pv = $("#pv"); pv.src = l.photo; pv.style.display = "block"; }
 
   let scanCtl = null;
-  const handle = async e => {
-    const all = [...e.target.files];
-    e.target.value = "";
-    if(!all.length) return;
-    const files = all.slice(0, 4), st = $("#st"), stop = $("#stop");
+  /* 画像は4枚まで選んでおき、「読み取る」を押してから読み取りを始める */
+  let staged = [];
+  const MAXIMG = 4;
+  const drawThumbs = () => {
+    const box = $("#thumbs");
+    box.querySelectorAll("img").forEach(i => { try { URL.revokeObjectURL(i.src); } catch(e){} });
+    box.innerHTML = staged.map((f, i) => `<div class="sthumb"><img alt="選んだ画像${i + 1}" src="${URL.createObjectURL(f)}"><button type="button" data-rm="${i}" aria-label="画像${i + 1}を外す">×</button></div>`).join("");
+    box.querySelectorAll("[data-rm]").forEach(b => b.onclick = () => { staged.splice(Number(b.dataset.rm), 1); drawThumbs(); });
+    const full = staged.length >= MAXIMG;
+    ["cam", "pick"].forEach(id => { const el = $("#" + id); el.disabled = full; const lb = el.closest("label") || document.querySelector(`label[for="${id}"]`); if(lb) lb.classList.toggle("dis", full); });
+    $("#readGo").disabled = !staged.length;
+    { const pv = $("#pv"); if(pv) pv.style.display = (!staged.length && l.photo) ? "block" : "none"; }
+  };
+  const addStaged = e => {
+    const fs = [...e.target.files]; e.target.value = "";
+    if(!fs.length) return;
+    const room = MAXIMG - staged.length, st = $("#st");
+    if(room <= 0){ st.className = "status err"; st.textContent = `画像は${MAXIMG}枚までです。入れ替えるときは、画像の×で外してください。`; return; }
+    staged.push(...fs.slice(0, room));
+    if(fs.length > room){ st.className = "status err"; st.textContent = `画像は${MAXIMG}枚までなので、先頭の${room}枚だけ追加しました。`; }
+    else { st.className = "status"; st.textContent = ""; }
+    drawThumbs();
+  };
+  $("#cam").addEventListener("change", addStaged);
+  $("#pick").addEventListener("change", addStaged);
+  drawThumbs();
+  const handle = async () => {
+    const files = staged.slice(), st = $("#st"), stop = $("#stop"), go = $("#readGo");
+    if(!files.length) return;
     scanCtl = new AbortController();
     st.className = "status"; st.textContent = "読み取り中…(数十秒かかることがあります)";
-    stop.hidden = false;
+    stop.hidden = false; go.hidden = true;
     try {
       const bigs = [];
       for(const f of files) bigs.push(await resizeImage(f, 1600, 0.85));
-      const small = await resizeImage(files[0], 600, 0.7);
-      l.photo = small;
-      const pv = $("#pv"); pv.src = small; pv.style.display = "block";
+      l.photo = await resizeImage(files[0], 600, 0.7);
       const r = await extractFromImage(bigs, scanCtl.signal);
       applyResult(r);
       if(window.__inferPref) window.__inferPref();
-      st.className = "status ok"; st.textContent = "読み取り完了。内容を確認してください。" + (all.length > 4 ? "(5枚目以降は読み取っていません)" : "");
+      st.className = "status ok"; st.textContent = "読み取り完了。内容を確認してください。";
     } catch(err){
       if(err && err.name === "AbortError") st.textContent = "";
       else { st.className = "status err"; st.textContent = err.message; }
-    } finally { stop.hidden = true; scanCtl = null; }
+    } finally { stop.hidden = true; go.hidden = false; scanCtl = null; }
   };
   $("#stop").onclick = () => scanCtl && scanCtl.abort();
-  $("#cam").onchange = handle;
-  $("#pick").onchange = handle;
+  $("#readGo").onclick = handle;
 
 
   $("#save").onclick = async () => {
