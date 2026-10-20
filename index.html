@@ -581,7 +581,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020J</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020K</div>
   `;
   $("#saveSet").onclick = () => {
     setSet({apiKey: $("#key").value.trim(), model: $("#model").value.trim() || DEFAULT_MODEL});
@@ -893,7 +893,7 @@ function openForm(existing){
       <div class="lh"><label>詳細</label></div><div class="cw"><textarea id="f_setlist" inputmode="url" autocapitalize="off" autocomplete="off" placeholder="URLを入力(複数のときは改行で区切る)" style="min-height:96px">${v("setlist")}</textarea><button type="button" class="cx" data-clr="f_setlist" aria-label="クリア">×</button></div>
     </div>
     ${existing ? `<button class="btn danger" id="del">削除</button>` : ""}
-    <div class="bbar"><div class="bbar-in"><button class="btn" id="save">保存</button><button class="btn sec" id="cancel">キャンセル</button></div></div>
+    <div class="bbar"><div class="bbar-in"><button class="btn sec" id="cancel">キャンセル</button><button class="btn" id="save">${existing ? "保存" : "登録"}</button></div></div>
   `;
   artistRows(splitArtists(l.artist).map(n => ({name: n, role: (l.artistRoles || {})[n] || ""})));
   /* 会場名から都道府県を決める: 登録済みの記録 → Geminiで推定(未選択のときだけ) */
@@ -1164,7 +1164,7 @@ function bSetNote(cls, text){ bNoteState = text ? {cls, text} : null; const n = 
 function bRefresh(){
   const list = $("#bList"); if(!list) return;
   if(!bItems.length){
-    list.innerHTML = `<div class="bempty">写真を追加すると、ここに1枚1公演ずつ並びます。<br>読み取りが終わったら内容を確認して、「登録する」を押します。</div>`;
+    list.innerHTML = `<div class="bempty">写真を追加すると、ここに1枚1公演ずつ並びます。<br>読み取りが終わったら内容を確認して、「登録」を押します。</div>`;
   } else {
     list.innerHTML = bItems.map(it => {
       const s = bSummary(it), [pl, pc] = B_PILL[it.status] || B_PILL.wait, m = bMedia[it.id];
@@ -1184,7 +1184,7 @@ function bRefresh(){
   run.disabled = !getSet().apiKey || (!bRunning && waiting === 0);
   run.textContent = bRunning ? "止める" : waiting ? `読み取る(${waiting}件)` : "読み取る";
   reg.disabled = !done || bRunning;
-  reg.textContent = done ? `登録する(${done}件)` : "登録する";
+  reg.textContent = done ? `登録(${done}件)` : "登録";
 }
 function openBatch(){
   saveScroll(); sub = true; subKind = "batch"; subEdit = false; subBack = () => setTab("list");
@@ -1203,7 +1203,7 @@ function renderBatch(){
     <input id="bCam" type="file" accept="image/*" capture="environment" style="display:none">
     <p class="bhint">写真1枚を1公演として読み取ります。チケットの写真や電子チケットのスクリーンショットを、まとめて選べます。</p>
     <div id="bList"></div>
-    <div class="bend"><button type="button" class="btn" id="bRun" disabled>読み取る</button><button type="button" class="btn" id="bReg" disabled>登録する</button></div>
+    <div class="bend"><button type="button" class="btn" id="bRun" disabled>読み取る</button><button type="button" class="btn" id="bReg" disabled>登録</button></div>
     <p class="bnote" id="bNote" role="status"></p>
     <div class="bbar"><div class="bbar-in"><button type="button" class="btn sec" id="bCancel">キャンセル</button><button type="button" class="btn sec" id="bDone">完了</button></div></div>`;
   bRefresh();
