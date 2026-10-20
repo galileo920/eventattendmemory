@@ -167,6 +167,8 @@ button.line{width:100%;text-align:left;cursor:pointer}
 .preview{max-width:100%;max-height:180px;border-radius:10px;margin-top:10px;display:block}
 .thumb{width:100%;border-radius:10px;margin-top:8px}
 select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font:inherit}
+.card select{height:46px;margin-top:4px;padding:0 12px}
+.cw>input,.cw>textarea,.cw>select{display:block}
 .dial{position:fixed;inset:0;z-index:8}
 .dial-scrim{position:absolute;inset:0;background:rgba(15,17,24,.45)}
 .dial-items{position:absolute;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(132px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;align-items:flex-end;gap:12px}
@@ -579,7 +581,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020G</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020H</div>
   `;
   $("#saveSet").onclick = () => {
     setSet({apiKey: $("#key").value.trim(), model: $("#model").value.trim() || DEFAULT_MODEL});
@@ -833,7 +835,7 @@ function openForm(existing){
       <img id="pv" class="preview" style="display:none">
       <button type="button" class="btn sec" id="stop" hidden>読み取りを中止</button>
       <div id="st" class="status"></div>
-      <div class="hint">チケット・フライヤー・予約画面のスクリーンショットなど。チケット画面と詳細画面を一緒に選ぶと(4枚まで)、1件にまとめて読み取ります。読み取り結果は下のフォームに入るので、確認・修正してから保存してください。</div>
+      <div class="hint">チケットの写真や電子チケットのスクリーンショットを読み取ります。チケット画面と詳細画面を一緒に選ぶと、1件にまとめて読み取ります。</div>
     </div>
     <div class="card">
       <label>公演名</label><div class="cw"><textarea id="f_title" placeholder=" " style="min-height:110px">${v("title")}</textarea><button type="button" class="cx" data-clr="f_title" aria-label="クリア">×</button></div>
@@ -844,7 +846,7 @@ function openForm(existing){
       <div id="artFetch">${getSet().apiKey ? `
         <button type="button" class="btn sec" id="artSearch">出演者を検索して候補を出す</button>
         <div class="status" id="stSearch"></div>
-        <label>URLから探す</label>
+        <div class="lh"><label>URLから探す</label></div>
         <div class="cw"><input id="artUrl" type="url" inputmode="url" placeholder="公演ページ・チケットページなどのURL" autocomplete="off"><button type="button" class="cx" data-clr="artUrl" aria-label="クリア">×</button></div>
         <button type="button" class="btn sec" id="artUrlGo">このURLのページから出演者を探す</button>
         <div class="status" id="stUrl"></div>
@@ -852,23 +854,23 @@ function openForm(existing){
         <input id="artImg" type="file" accept="image/*" multiple hidden>
         <div class="status" id="stImg"></div>
         <div id="artRes"></div>` : `<div class="hint">出演者を検索・取得するには、データタブでGeminiのAPIキーを入力してください。</div>`}</div>
-      <label for="artIn">出演者をまとめて追加</label>
+      <div class="lh"><label for="artIn">出演者をまとめて追加</label></div>
       <div class="cw"><textarea id="artIn" style="min-height:72px" placeholder="名前を「、」「,」や改行で区切って入力"></textarea><button type="button" class="cx" data-clr="artIn" aria-label="クリア">×</button></div>
       <button type="button" class="btn sec" id="artApply">入力欄に追加</button>
       <div class="status" id="stApply"></div>
-      <label>会場</label><div class="cw"><input id="f_venue" placeholder=" " value="${v("venue")}"><button type="button" class="cx" data-clr="f_venue" aria-label="クリア">×</button></div>
-      <label>会場(都道府県)</label><div class="cw"><select id="f_pref"><option value="">未選択</option>${PREFS.map(x => `<option value="${x}"${l.pref === x ? " selected" : ""}>${x}</option>`).join("")}</select></div>
+      <div class="lh"><label>会場</label></div><div class="cw"><input id="f_venue" placeholder=" " value="${v("venue")}"><button type="button" class="cx" data-clr="f_venue" aria-label="クリア">×</button></div>
+      <div class="lh"><label>会場(都道府県)</label></div><div class="cw"><select id="f_pref"><option value="">未選択</option>${PREFS.map(x => `<option value="${x}"${l.pref === x ? " selected" : ""}>${x}</option>`).join("")}</select></div>
       <div class="status" id="stPref"></div>
       <div class="row3">
-        <div><label>日付</label><input id="f_date" type="date" value="${v("date")}"></div>
-        <div><label>開場</label><input id="f_open" type="time" value="${v("open")}"></div>
-        <div><label>開演</label><input id="f_start" type="time" value="${v("start")}"></div>
+        <div><div class="lh"><label>日付</label></div><input id="f_date" type="date" value="${v("date")}"></div>
+        <div><div class="lh"><label>開場</label></div><input id="f_open" type="time" value="${v("open")}"></div>
+        <div><div class="lh"><label>開演</label></div><input id="f_start" type="time" value="${v("start")}"></div>
       </div>
-      <label>席種・券種</label><div class="cw"><input id="f_seatType" placeholder=" " value="${v("seatType")}"><button type="button" class="cx" data-clr="f_seatType" aria-label="クリア">×</button></div>
-      <label>座席・整理番号</label><div class="cw"><input id="f_seat" placeholder=" " value="${v("seat")}"><button type="button" class="cx" data-clr="f_seat" aria-label="クリア">×</button></div>
-      <label>チケット代</label><div class="cw"><input id="f_price" placeholder=" " type="number" inputmode="numeric" value="${v("price")}"><button type="button" class="cx" data-clr="f_price" aria-label="クリア">×</button></div>
+      <div class="lh"><label>席種・券種</label></div><div class="cw"><input id="f_seatType" placeholder=" " value="${v("seatType")}"><button type="button" class="cx" data-clr="f_seatType" aria-label="クリア">×</button></div>
+      <div class="lh"><label>座席・整理番号</label></div><div class="cw"><input id="f_seat" placeholder=" " value="${v("seat")}"><button type="button" class="cx" data-clr="f_seat" aria-label="クリア">×</button></div>
+      <div class="lh"><label>チケット代</label></div><div class="cw"><input id="f_price" placeholder=" " type="number" inputmode="numeric" value="${v("price")}"><button type="button" class="cx" data-clr="f_price" aria-label="クリア">×</button></div>
       <label>ジャンル</label><select id="f_genre">${GENRES.map(g => `<option${genreOf(l) === g ? " selected" : ""}>${g}</option>`).join("")}</select>
-      <label>詳細</label><div class="cw"><textarea id="f_setlist" inputmode="url" autocapitalize="off" autocomplete="off" placeholder="URLを入力(複数のときは改行で区切る)" style="min-height:96px">${v("setlist")}</textarea><button type="button" class="cx" data-clr="f_setlist" aria-label="クリア">×</button></div>
+      <div class="lh"><label>詳細</label></div><div class="cw"><textarea id="f_setlist" inputmode="url" autocapitalize="off" autocomplete="off" placeholder="URLを入力(複数のときは改行で区切る)" style="min-height:96px">${v("setlist")}</textarea><button type="button" class="cx" data-clr="f_setlist" aria-label="クリア">×</button></div>
     </div>
     <button class="btn" id="save">保存</button>
     <button class="btn sec" id="cancel">キャンセル</button>
