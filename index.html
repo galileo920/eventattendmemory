@@ -607,7 +607,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020T</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020U</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
@@ -714,7 +714,7 @@ function openDetail(id){
       <div class="m">${fmtDate(l.date)}${venueLabel(l) ? " ／ " + esc(venueLabel(l)) : ""}</div>
     </div>
     ${(() => { const a = (l.artist || "").split("、").map(x => x.trim()).filter(Boolean); return a.length > 10 ? `<div class="field scroll"><small>出演者</small><div tabindex="0">${esc(a.join("\n"))}</div></div>` : row("出演者", a.join("\n")); })()}
-    ${row("開場 / 開演", [l.open, l.start].filter(Boolean).map(fmtTime).join(" / "))}
+    ${row("開場 / 開演", [l.open, l.start].filter(Boolean).map(fmtTime).join(" ／ "))}
     ${row("席種・券種", l.seatType)}
     ${row("座席・整理番号", l.seat)}
     ${row("チケット代", l.price !== "" && l.price != null ? yen(l.price) : "")}
