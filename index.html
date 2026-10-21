@@ -681,7 +681,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ Ver:1.1.5</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ Ver:1.1.6</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
@@ -721,17 +721,17 @@ async function shareOrDownload(blob, name){
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   return true;
 }
-function stamp(){ const d = new Date(), p = n => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`; }
+function stamp(){ const d = new Date(), p = n => String(n).padStart(2, "0"); return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`; }
 async function exportJSON(){
   const blob = new Blob([JSON.stringify({version: 2, lives, aliases}, null, 1)], {type: "application/json"});
-  if(await shareOrDownload(blob, `eventlog-${stamp()}.json`)) setDataMsg("ok", "保存しました。");
+  if(await shareOrDownload(blob, `eventlog_${stamp()}.json`)) setDataMsg("ok", "保存しました。");
 }
 async function exportCSV(){
   const cols = FIELDS;
   const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const rows = [cols.join(",")].concat(lives.slice().sort((a, b) => (a.date || "").localeCompare(b.date || "")).map(l => cols.map(c => q(c === "genre" ? genreOf(l) : l[c])).join(",")));
   const blob = new Blob(["\ufeff" + rows.join("\r\n")], {type: "text/csv"});
-  if(await shareOrDownload(blob, `eventlog-${stamp()}.csv`)) setDataMsg("ok", "保存しました。");
+  if(await shareOrDownload(blob, `eventlog_${stamp()}.csv`)) setDataMsg("ok", "保存しました。");
 }
 async function importJSON(e){
   const f = e.target.files && e.target.files[0];
