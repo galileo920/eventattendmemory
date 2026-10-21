@@ -75,7 +75,8 @@ textarea{resize:vertical;min-height:84px}
 .cw>.search{margin-bottom:0}
 input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display:none}
 label{display:block;margin-top:14px;font-size:13px;color:var(--sub);font-weight:500}
-.sortrow{display:flex;justify-content:flex-end;margin:-2px 0 4px}
+.sortrow{display:flex;justify-content:space-between;align-items:center;margin:-2px 0 4px}
+.sortrow .cnt{font-size:13px;color:var(--sub)}
 .sortrow button{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:500;cursor:pointer}
 .sugg{border:1px solid var(--line);border-radius:10px;background:var(--surface);margin-top:4px;overflow:hidden}
 .sugg button{display:block;width:100%;text-align:left;border:0;border-top:1px solid var(--line);background:none;padding:10px 12px;font:inherit;cursor:pointer}
@@ -515,7 +516,7 @@ function renderList(){
   $("#app").innerHTML = `
     <div class="cw sw"><input class="search" id="q" type="search" placeholder="公演名・出演者・会場で検索" value="${esc(query)}"><button type="button" class="cx" data-clr="q" aria-label="クリア">×</button></div>
     ${filterBar()}
-    <div class="sortrow"><button type="button" id="sortToggle" aria-label="並び順を切り替え">${sortAsc ? "古い順" : "新しい順"} ⇅</button></div>
+    <div class="sortrow"><span class="cnt" id="listCnt"></span><button type="button" id="sortToggle" aria-label="並び順を切り替え">${sortAsc ? "古い順" : "新しい順"} ⇅</button></div>
     ${exact ? `<div class="exact"><span>${exact.kind === "venue" ? "会場" : exact.kind === "pref" ? "都道府県" : "出演者"}「${esc(exact.value)}」と完全一致</span><button type="button" id="exOff">解除</button></div>` : ""}
     <div id="listBody"></div>
   `;
@@ -538,6 +539,7 @@ function fillList(){
     .sort((a, b) => { const x = a.date || "", y = b.date || ""; if(!x || !y) return (x ? 0 : 1) - (y ? 0 : 1); return sortAsc ? x.localeCompare(y) : y.localeCompare(x); });
   const box = $("#listBody");
   if(!box) return;
+  const cn = $("#listCnt"); if(cn) cn.textContent = rows.length + "件";
   let lastY = null;
   box.innerHTML = rows.length ? rows.map(l => {
     const p = dateParts(l.date), y = p ? p.y + "年" : "日付未設定";
@@ -609,7 +611,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1021C</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1021E</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
