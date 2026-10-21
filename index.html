@@ -601,7 +601,7 @@ function fillList(){
   const rows = filtered()
     .filter(l => !exact || (exact.kind === "venue" ? canon("venue", l.venue) === exact.value : exact.kind === "pref" ? l.pref === exact.value : canonArtists(l).includes(exact.value)))
     .filter(l => !q || ["title","artist","venue"].some(f => String(l[f] ?? "").toLowerCase().includes(q)) || aliasHay(l).includes(q))
-    .sort((a, b) => { const x = a.date || "", y = b.date || ""; if(!x || !y) return (x ? 0 : 1) - (y ? 0 : 1); return sortAsc ? x.localeCompare(y) : y.localeCompare(x); });
+    .sort((a, b) => { const x = a.date || "", y = b.date || ""; if(!x || !y) return (x ? 0 : 1) - (y ? 0 : 1); if(x !== y) return sortAsc ? x.localeCompare(y) : y.localeCompare(x); const s = a.start || a.open || "", t = b.start || b.open || ""; if(s === t) return 0; if(!s || !t) return s ? -1 : 1; return sortAsc ? s.localeCompare(t) : t.localeCompare(s); });
   const box = $("#listBody");
   if(!box) return;
   const cn = $("#listCnt"); if(cn) cn.textContent = rows.length + "件";
@@ -681,7 +681,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ Ver:1.1.7</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ Ver:1.1.8</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
