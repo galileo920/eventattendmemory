@@ -614,7 +614,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1021G</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1021I</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
@@ -1223,7 +1223,7 @@ function bEditHtml(it){
     ${inp("price", "チケット代", 'type="number" inputmode="numeric"')}
     ${it.err ? `<div class="bmsg">${esc(it.err)}</div>` : ""}
     <div class="bacts">
-      ${bMedia[it.id] ? `<button type="button" class="btn sec small" data-bact="retry" data-bid="${it.id}">読み取り直す</button>` : ""}
+      ${bMedia[it.id] ? `<button type="button" class="btn sec small" data-bact="retry" data-bid="${it.id}">再読み取り</button>` : ""}
       <button type="button" class="btn sec small" data-bact="del" data-bid="${it.id}" style="color:var(--danger)">削除</button>
     </div>
   </div>`;
@@ -1301,7 +1301,7 @@ function renderBatch(){
         bItems = bItems.filter(i => i.id !== id); bPersist(); bRefresh();
       } else if(act.dataset.bact === "retry"){
         const it = bItems.find(i => i.id === id); if(!it) return;
-        it.status = "wait"; it.err = ""; bPersist(); bRefresh(); if(!bRunning) bRunAll([id]);
+        it.status = "wait"; it.err = ""; it.open = false; bPersist(); bRefresh(); if(!bRunning) bRunAll([id]);
       }
       return;
     }
