@@ -621,7 +621,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1021K</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1021M</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
@@ -904,7 +904,7 @@ function openForm(existing){
       <div class="thumbs" id="thumbs"></div>
       <img id="pv" class="preview" style="display:none">
       <button type="button" class="btn" id="readGo" disabled>読み取る</button>
-      <button type="button" class="btn sec" id="stop" hidden>読み取りを中止</button>
+      <button type="button" class="btn sec" id="stop" hidden>中止</button>
       <div id="st" class="status"></div>
       <div class="hint">チケットの写真や電子チケットのスクリーンショットを読み取ります。チケット画面と詳細画面を一緒に選ぶと、1件にまとめて読み取ります。</div>
     </div>
@@ -1263,7 +1263,7 @@ function bRefresh(){
   const done = bItems.filter(i => i.status === "ok").length;
   const run = $("#bRun"), reg = $("#bReg");
   run.disabled = !getSet().apiKey || (!bRunning && waiting === 0);
-  run.textContent = bRunning ? "止める" : waiting ? `読み取る(${waiting}件)` : "読み取る";
+  run.textContent = bRunning ? "中止" : waiting ? `読み取る(${waiting}件)` : "読み取る";
   reg.disabled = !done || bRunning;
   reg.textContent = done ? `登録(${done}件)` : "登録";
 }
