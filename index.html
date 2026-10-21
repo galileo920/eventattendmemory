@@ -131,6 +131,10 @@ button.line{width:100%;text-align:left;cursor:pointer}
 .card h2{margin:0 0 4px;font-size:15px}
 .hint{font-size:12px;color:var(--sub);margin-top:6px}
 .status{margin-top:10px;font-size:14px}
+.alrow{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.alk{flex:none;font-size:12px;color:var(--sub);border:1px solid var(--line);border-radius:999px;padding:2px 8px}
+.aln{flex:1;min-width:0;overflow-wrap:anywhere}
+.alx{flex:none;border:0;background:none;color:var(--danger);font-size:20px;cursor:pointer;padding:4px 8px}
 .status.ok{color:var(--ok)}.status.err{color:var(--danger)}
 .thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
 .thumbs:empty{display:none}
@@ -284,6 +288,49 @@ const PREFS = ["北海道","青森県","岩手県","宮城県","秋田県","山�
 const normPref = v => { const t = String(v || "").trim(); if(!t) return ""; return PREFS.find(x => x === t) || PREFS.find(x => x.replace(/[都道府県]$/, "") === t.replace(/[都道府県]$/, "")) || ""; };
 const venueLabel = l => l.venue ? l.venue + (l.pref ? `(${l.pref})` : "") : (l.pref || "");
 const genreOf = l => l && l.genre === "ライブ" ? "音楽" : l && l.genre === "演劇" ? "舞台" : GENRES.includes(l && l.genre) ? l.genre : "音楽";
+/* ---------- 名寄せ(旧名 → 現在の名前) ---------- */
+const ALIAS_LS = "livelog_alias_v1";
+let aliases = {venue: {}, artist: {}};
+const cleanAliasMap = m => { const o = {}; if(m && typeof m === "object" && !Array.isArray(m)) Object.keys(m).forEach(k => { const v = m[k], a = String(k).trim(); if(typeof v === "string" && a && v.trim() && a !== v.trim()) o[a] = v.trim(); }); return o; };
+const setAliases = a => { aliases = {venue: cleanAliasMap(a && a.venue), artist: cleanAliasMap(a && a.artist)}; };
+try { setAliases(JSON.parse(localStorage.getItem(ALIAS_LS) || "{}")); } catch(e){}
+const canon = (kind, name) => { const m = aliases[kind] || {}; let n = String(name || "").trim(), i = 0; while(Object.prototype.hasOwnProperty.call(m, n) && i++ < 20) n = m[n]; return n; };
+const aliasNames = (kind, name) => { const c = canon(kind, name); return [c].concat(Object.keys(aliases[kind] || {}).filter(k => canon(kind, k) === c)); };
+const splitNames = s => String(s || "").split(/[、,，]/).map(x => x.trim()).filter(Boolean);
+const canonArtists = l => [...new Set(splitNames(l.artist).map(a => canon("artist", a)))];
+const aliasHay = l => [].concat(l.venue ? aliasNames("venue", l.venue) : [], ...splitNames(l.artist).map(a => aliasNames("artist", a))).join("\n").toLowerCase();
+async function saveAliases(){
+  try { localStorage.setItem(ALIAS_LS, JSON.stringify(aliases)); } catch(e){}
+  if(typeof store !== "undefined" && store && store.putAlias){ try { await store.putAlias(aliases); } catch(e){} }
+}
+function aliasCardHtml(){
+  const rows = ["artist", "venue"].flatMap(k => Object.keys(aliases[k]).map(o => ({k, o, n: aliases[k][o]})));
+  return `<div class="card">
+    <h2>名寄せ(改名・旧名)</h2>
+    <div class="hint">会場や出演者の名前が変わったときに、旧名を現在の名前にまとめます。集計・検索・絞り込みで同じものとして扱います。記録に入力した名前は変わりません。</div>
+    ${rows.length ? rows.map(r => `<div class="alrow"><span class="alk">${r.k === "venue" ? "会場" : "出演者"}</span><span class="aln">${esc(r.o)} → ${esc(r.n)}</span><button type="button" class="alx" data-alk="${r.k}" data-alo="${esc(r.o)}" aria-label="削除">×</button></div>`).join("") : `<div class="hint">登録はありません。</div>`}
+    <label for="alKind">種類</label><select id="alKind"><option value="artist">出演者</option><option value="venue">会場</option></select>
+    <label for="alOld">旧名</label><input id="alOld" list="alDl" autocomplete="off">
+    <label for="alNew">現在の名前</label><input id="alNew" list="alDl" autocomplete="off">
+    <datalist id="alDl"></datalist>
+    <button class="btn" id="alAdd" type="button" style="margin-top:12px">追加</button>
+    <div class="status" id="alSt"></div>
+  </div>`;
+}
+function bindAliasCard(rerender){
+  const fillDl = () => { const k = $("#alKind").value; const ns = [...new Set(lives.flatMap(l => k === "venue" ? (l.venue ? [l.venue] : []) : splitNames(l.artist)))].sort(); $("#alDl").innerHTML = ns.map(n => `<option value="${esc(n)}">`).join(""); };
+  fillDl();
+  $("#alKind").onchange = fillDl;
+  $("#alAdd").onclick = async () => {
+    const k = $("#alKind").value, o = $("#alOld").value.trim(), n = $("#alNew").value.trim(), st = $("#alSt");
+    const err = m => { st.className = "status err"; st.textContent = m; };
+    if(!o || !n) return err("旧名と現在の名前を入力してください。");
+    if(o === n) return err("旧名と現在の名前が同じです。");
+    if(canon(k, n) === o) return err("逆向きの登録があるため追加できません。");
+    aliases[k][o] = n; await saveAliases(); rerender();
+  };
+  document.querySelectorAll("#app .alx").forEach(b => b.onclick = async () => { delete aliases[b.dataset.alk][b.dataset.alo]; await saveAliases(); rerender(); });
+}
 const FIELDS = ["genre","title","artist","venue","pref","date","open","start","seatType","seat","price","setlist"];
 /* 自動入力・貼り付け取り込みの対象(同行者・セットリスト・メモは手入力のみ) */
 const AUTO_FIELDS = ["genre","title","artist","venue","pref","date","open","start","seatType","seat","price"];
@@ -523,7 +570,7 @@ function renderList(){
     <div class="cw sw"><input class="search" id="q" type="search" placeholder="公演名・出演者・会場で検索" value="${esc(query)}"><button type="button" class="cx" data-clr="q" aria-label="クリア">×</button></div>
     ${filterBar()}
     <div class="sortrow"><span class="cnt" id="listCnt"></span><button type="button" id="sortToggle" aria-label="並び順を切り替え">${sortAsc ? "古い順" : "新しい順"} ⇅</button></div>
-    ${exact ? `<div class="exact"><span>${exact.kind === "venue" ? "会場" : exact.kind === "pref" ? "都道府県" : "出演者"}「${esc(exact.value)}」と完全一致</span><button type="button" id="exOff">解除</button></div>` : ""}
+    ${exact ? `<div class="exact"><span>${exact.kind === "venue" ? "会場" : exact.kind === "pref" ? "都道府県" : "出演者"}「${esc(exact.value)}」と完全一致${exact.kind !== "pref" && aliasNames(exact.kind, exact.value).length > 1 ? "(旧名を含む)" : ""}</span><button type="button" id="exOff">解除</button></div>` : ""}
     <div id="listBody"></div>
   `;
   bindFilter();
@@ -540,8 +587,8 @@ function renderList(){
 function fillList(){
   const q = query.trim().toLowerCase();
   const rows = filtered()
-    .filter(l => !exact || (exact.kind === "venue" ? l.venue === exact.value : exact.kind === "pref" ? l.pref === exact.value : (l.artist || "").split(/[、,，]/).map(x => x.trim()).includes(exact.value)))
-    .filter(l => !q || ["title","artist","venue"].some(f => String(l[f] ?? "").toLowerCase().includes(q)))
+    .filter(l => !exact || (exact.kind === "venue" ? canon("venue", l.venue) === exact.value : exact.kind === "pref" ? l.pref === exact.value : canonArtists(l).includes(exact.value)))
+    .filter(l => !q || ["title","artist","venue"].some(f => String(l[f] ?? "").toLowerCase().includes(q)) || aliasHay(l).includes(q))
     .sort((a, b) => { const x = a.date || "", y = b.date || ""; if(!x || !y) return (x ? 0 : 1) - (y ? 0 : 1); return sortAsc ? x.localeCompare(y) : y.localeCompare(x); });
   const box = $("#listBody");
   if(!box) return;
@@ -569,8 +616,8 @@ function renderStats(){
   lives.filter(l => !fYear || yearOf(l) === fYear).forEach(l => { const g = genreOf(l); const o = genres[g] || (genres[g] = {n: 0, spend: 0}); o.n++; o.spend += Number(l.price) || 0; });
   lives.filter(l => !fGenre || genreOf(l) === fGenre).forEach(l => { const y = yearOf(l); if(!y) return; const o = years[y] || (years[y] = {n: 0, spend: 0}); o.n++; o.spend += Number(l.price) || 0; });
   fl.forEach(l => {
-    (l.artist || "").split(/[、,，]/).map(x => x.trim()).filter(Boolean).forEach(a => { artists[a] = (artists[a] || 0) + 1; });
-    if(l.venue) venues[l.venue] = (venues[l.venue] || 0) + 1;
+    canonArtists(l).forEach(a => { artists[a] = (artists[a] || 0) + 1; });
+    if(l.venue){ const v = canon("venue", l.venue); venues[v] = (venues[v] || 0) + 1; }
     if(l.pref) prefs[l.pref] = (prefs[l.pref] || 0) + 1;
   });
   const sorted = o => Object.entries(o).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ja"));
@@ -616,12 +663,13 @@ function renderSettings(){
       <button class="btn sec" id="csv">CSVを書き出す</button>
       <div class="status" id="dst"></div>
     </div>
+    ${aliasCardHtml()}
     <div class="card">
       <h2>データ削除</h2>
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ Ver:1.0.0</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ Ver:1.1.0</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
@@ -637,13 +685,14 @@ function renderSettings(){
     else { st.className = "status"; st.textContent = "保存しました。APIキーが空です。"; }
   };
   if(dataMsg){ const d = $(dataMsg.id || "#dst"); d.className = "status " + dataMsg.cls; d.textContent = dataMsg.text; }
+  bindAliasCard(renderSettings);
   $("#export").onclick = exportJSON;
   $("#csv").onclick = exportCSV;
   $("#import").addEventListener("change", importJSON);
   $("#import").addEventListener("input", importJSON);
   $("#wipe").onclick = async () => {
     if(!confirm("全ての記録を削除します。元に戻せません。よろしいですか?")) return;
-    await dbClear(); await refresh(); render(); setDataMsg("ok", "全データを削除しました。", "#wst");
+    await dbClear(); setAliases({}); await saveAliases(); await refresh(); render(); setDataMsg("ok", "全データを削除しました。", "#wst");
   };
 }
 
@@ -662,7 +711,7 @@ async function shareOrDownload(blob, name){
 }
 function stamp(){ return new Date().toISOString().slice(0, 10); }
 async function exportJSON(){
-  const blob = new Blob([JSON.stringify({version: 2, lives}, null, 1)], {type: "application/json"});
+  const blob = new Blob([JSON.stringify({version: 2, lives, aliases}, null, 1)], {type: "application/json"});
   if(await shareOrDownload(blob, `livelog-${stamp()}.json`)) setDataMsg("ok", "保存しました。");
 }
 async function exportCSV(){
@@ -684,6 +733,7 @@ async function importJSON(e){
     try { j = JSON.parse(text.replace(/^\uFEFF/, "")); } catch(e2){ throw new Error("JSONとして読み取れませんでした(書き出したJSONファイルを選んでください)"); }
     const arr = Array.isArray(j) ? j : j && j.lives;
     if(!Array.isArray(arr)) throw new Error("記録のデータが見つかりませんでした");
+    if(j && !Array.isArray(j) && j.aliases && typeof j.aliases === "object"){ const ja = j.aliases; setAliases({venue: {...aliases.venue, ...cleanAliasMap(ja.venue)}, artist: {...aliases.artist, ...cleanAliasMap(ja.artist)}}); await saveAliases(); }
     let n = 0;
     for(const r of arr){
       if(!r || typeof r !== "object") continue;
@@ -741,7 +791,7 @@ function openDetail(id){
   `;
   $("#back").onclick = () => setTab("list");
   $("#edit").onclick = () => openForm(l);
-  document.querySelectorAll("#app .lk").forEach(b => b.onclick = () => { fGenre = ""; fYear = ""; exact = {kind: b.dataset.lk, value: b.dataset.q}; query = ""; setTab("list", {top: true}); });
+  document.querySelectorAll("#app .lk").forEach(b => b.onclick = () => { fGenre = ""; fYear = ""; exact = {kind: b.dataset.lk, value: b.dataset.lk === "pref" ? b.dataset.q : canon(b.dataset.lk, b.dataset.q)}; query = ""; setTab("list", {top: true}); });
 }
 
 /* 抽出結果(オブジェクト)をフォームに反映 */
@@ -821,9 +871,9 @@ function regCands(kind, typed, skipNames){
   const m = new Map();
   lives.forEach(l => {
     const names = kind === "venue" ? (l.venue ? [l.venue] : []) : (l.artist || "").split(/[、,，]/).map(x => x.trim()).filter(Boolean);
-    names.forEach(n => { const o = m.get(n) || {name: n, n: 0, pref: ""}; o.n++; if(kind === "venue" && l.pref) o.pref = l.pref; m.set(n, o); });
+    names.forEach(n0 => { const n = canon(kind, n0); const o = m.get(n) || {name: n, n: 0, pref: ""}; o.n++; if(kind === "venue" && l.pref) o.pref = l.pref; m.set(n, o); });
   });
-  return [...m.values()].filter(o => o.name !== typed.trim() && !(skipNames || []).includes(o.name) && norm(o.name).startsWith(t))
+  return [...m.values()].filter(o => o.name !== typed.trim() && !(skipNames || []).includes(o.name) && aliasNames(kind, o.name).some(x => norm(x).startsWith(t)))
     .sort((a, b) => b.n - a.n).slice(0, 6);
 }
 function showSugg(input, cands, onPick){
