@@ -668,10 +668,10 @@ function renderSettings(){
     <div class="card">
       <h2>バックアップ</h2>
       <div class="hint">iOSはブラウザのデータが消えることがあります。定期的に書き出して、ファイルAppやiCloud Driveに保存してください。</div>
-      <label class="btn sec" style="text-align:center">JSONを読み込む
+      <label class="btn sec" style="text-align:center">バックアップファイルを読み込む
         <input id="import" type="file" accept="application/json,.json" style="display:none">
       </label>
-      <button class="btn sec" id="export">JSONを書き出す</button>
+      <button class="btn sec" id="export">バックアップファイルを書き出す</button>
       <button class="btn sec" id="csv">CSVを書き出す</button>
       <div class="status" id="dst"></div>
     </div>
@@ -681,7 +681,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ Ver:1.1.2</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ Ver:1.1.3</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
@@ -742,7 +742,7 @@ async function importJSON(e){
     let text = "";
     try { text = await f.text(); } catch(e1){ throw new Error("ファイルを読み取れませんでした"); }
     let j;
-    try { j = JSON.parse(text.replace(/^\uFEFF/, "")); } catch(e2){ throw new Error("JSONとして読み取れませんでした(書き出したJSONファイルを選んでください)"); }
+    try { j = JSON.parse(text.replace(/^\uFEFF/, "")); } catch(e2){ throw new Error("バックアップファイルとして読み取れませんでした(書き出したバックアップファイルを選んでください)"); }
     const arr = Array.isArray(j) ? j : j && j.lives;
     if(!Array.isArray(arr)) throw new Error("記録のデータが見つかりませんでした");
     if(j && !Array.isArray(j) && j.aliases && typeof j.aliases === "object"){ const ja = j.aliases; setAliases({venue: {...aliases.venue, ...cleanAliasMap(ja.venue)}, artist: {...aliases.artist, ...cleanAliasMap(ja.artist)}}); await saveAliases(); }
@@ -980,7 +980,7 @@ function openForm(existing){
         <button type="button" class="btn sec" id="artSearch">出演者を検索して候補を出す</button>
         <div class="status" id="stSearch"></div>
         <div class="lh"><label>URLから探す</label></div>
-        <div class="cw"><input id="artUrl" type="url" inputmode="url" placeholder="公演ページ・チケットページなどのURL" autocomplete="off"><button type="button" class="cx" data-clr="artUrl" aria-label="クリア">×</button></div>
+        <div class="cw"><input id="artUrl" type="url" inputmode="url" placeholder=" " autocomplete="off"><button type="button" class="cx" data-clr="artUrl" aria-label="クリア">×</button></div>
         <button type="button" class="btn sec" id="artUrlGo">このURLのページから出演者を探す</button>
         <div class="status" id="stUrl"></div>
         <label class="btn sec" for="artImg">画像から出演者を読み取る</label>
