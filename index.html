@@ -614,7 +614,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1021I</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1021J</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
@@ -1204,6 +1204,12 @@ function bSummary(it){
   }
   return {t: it.status === "err" ? "読み取れませんでした" : it.status === "run" ? "読み取り中…" : "未読み取り", m: ""};
 }
+function bFailHtml(it){
+  return `<div class="bedit">${it.err ? `<div class="bmsg">${esc(it.err)}</div>` : ""}<div class="bacts">
+    ${bMedia[it.id] ? `<button type="button" class="btn sec small" data-bact="retry" data-bid="${it.id}">再読み取り</button>` : ""}
+    <button type="button" class="btn sec small" data-bact="del" data-bid="${it.id}" style="color:var(--danger)">削除</button>
+  </div></div>`;
+}
 function bEditHtml(it){
   const f = it.f;
     const inp = (k, label, extra = "") => `<label for="b${it.id}-${k}">${label}</label><div class="cw"><input id="b${it.id}-${k}" data-bid="${it.id}" data-k="${k}" value="${esc(f[k])}" placeholder=" " ${extra}><button type="button" class="cx" data-clr="b${it.id}-${k}" aria-label="クリア">×</button></div>`;
@@ -1237,12 +1243,12 @@ function bRefresh(){
     list.innerHTML = bItems.map(it => {
       const s = bSummary(it), [pl, pc] = B_PILL[it.status] || B_PILL.wait, m = bMedia[it.id];
       return `<div class="bitem">
-        <div class="brow" role="button" tabindex="0" data-btoggle="${it.id}" aria-expanded="${it.open}">
+        <div class="brow"${it.status === "err" ? "" : ` role="button" tabindex="0" data-btoggle="${it.id}" aria-expanded="${it.open}"`}>
           <div class="bthumb"${m ? ` style="background-image:url('${m.url}')"` : ""}>${m ? "" : "写真なし"}</div>
           <div class="bsum"><div class="t">${esc(s.t)}</div>${s.m ? `<div class="m">${esc(s.m)}</div>` : ""}</div>
           <span class="bpill ${pc}">${pl}</span>
         </div>
-        ${it.open ? bEditHtml(it) : ""}
+        ${it.status === "err" ? bFailHtml(it) : it.open ? bEditHtml(it) : ""}
       </div>`;
     }).join("");
   }
