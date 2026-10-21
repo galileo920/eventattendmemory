@@ -151,8 +151,8 @@ button.line{width:100%;text-align:left;cursor:pointer}
 .gleg{display:flex;flex-wrap:wrap;gap:6px 14px;margin:-2px 2px 14px;font-size:12px;color:var(--sub)}
 .gleg span{display:inline-flex;align-items:center;gap:5px}
 .gleg i{width:9px;height:9px;border-radius:50%;background:var(--c);display:inline-block}
-.seg{display:flex;gap:6px;margin:16px 0 8px}
-.seg button{flex:1;padding:10px 0;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-size:15px;cursor:pointer}
+.seg{display:flex;gap:5px;margin:16px 0 8px}
+.seg button{flex:1;padding:10px 0;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-size:14px;cursor:pointer}
 .seg button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
 .h2{font-size:13px;color:var(--sub);font-weight:500;margin:18px 0 6px}
 .line{display:flex;justify-content:space-between;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:6px}
@@ -558,6 +558,8 @@ function renderStats(){
   const spend = fl.reduce((s, l) => s + (Number(l.price) || 0), 0);
   const artists = {}, venues = {}, prefs = {}, years = {};
   const gParts = !fGenre && total ? GENRES.map(g => { const ls = fl.filter(l => genreOf(l) === g); return {g, n: ls.length, s: ls.reduce((s, l) => s + (Number(l.price) || 0), 0)}; }).filter(p => p.n) : null;
+  const genres = {};
+  lives.filter(l => !fYear || yearOf(l) === fYear).forEach(l => { const g = genreOf(l); const o = genres[g] || (genres[g] = {n: 0, spend: 0}); o.n++; o.spend += Number(l.price) || 0; });
   lives.filter(l => !fGenre || genreOf(l) === fGenre).forEach(l => { const y = yearOf(l); if(!y) return; const o = years[y] || (years[y] = {n: 0, spend: 0}); o.n++; o.spend += Number(l.price) || 0; });
   fl.forEach(l => {
     (l.artist || "").split(/[、,，]/).map(x => x.trim()).filter(Boolean).forEach(a => { artists[a] = (artists[a] || 0) + 1; });
@@ -573,14 +575,15 @@ function renderStats(){
       <div class="sc"><label>チケット代</label><div class="card">${gParts && spend ? donut(gParts.map(p => ({g: p.g, v: p.s})), "ジャンル別のチケット代の内訳") : ""}<b>${spend ? yen(spend) : "-"}</b></div></div>
     </div>
     ${gParts ? `<div class="gleg">${gParts.map(p => `<span><i style="--c:${GCOLOR[p.g]}"></i>${esc(p.g)}</span>`).join("")}</div>` : ""}
-    <div class="seg" role="tablist"><button type="button" role="tab" id="sgA" class="${statTab === "artist" ? "on" : ""}" aria-selected="${statTab === "artist"}">出演者</button><button type="button" role="tab" id="sgV" class="${statTab === "venue" ? "on" : ""}" aria-selected="${statTab === "venue"}">会場</button><button type="button" role="tab" id="sgP" class="${statTab === "pref" ? "on" : ""}" aria-selected="${statTab === "pref"}">都道府県</button><button type="button" role="tab" id="sgY" class="${statTab === "year" ? "on" : ""}" aria-selected="${statTab === "year"}">年</button></div>
-    ${statTab === "venue" ? list(sorted(venues), "venue") : statTab === "year" ? (Object.keys(years).length ? Object.keys(years).sort().reverse().map(y => `<button type="button" class="line" data-k="year" data-q="${y}"><span>${y}年</span><b>${years[y].n}回${years[y].spend ? " ・ " + yen(years[y].spend) : ""} ›</b></button>`).join("") : `<div class="hint">データなし</div>`) : statTab === "pref" ? list(Object.entries(prefs).sort((a, b) => b[1] - a[1] || PREFS.indexOf(a[0]) - PREFS.indexOf(b[0])), "pref") : list(sorted(artists), "artist")}`;
+    <div class="seg" role="tablist"><button type="button" role="tab" id="sgA" class="${statTab === "artist" ? "on" : ""}" aria-selected="${statTab === "artist"}">出演者</button><button type="button" role="tab" id="sgV" class="${statTab === "venue" ? "on" : ""}" aria-selected="${statTab === "venue"}">会場</button><button type="button" role="tab" id="sgP" class="${statTab === "pref" ? "on" : ""}" aria-selected="${statTab === "pref"}">都道府県</button><button type="button" role="tab" id="sgG" class="${statTab === "genre" ? "on" : ""}" aria-selected="${statTab === "genre"}">ジャンル</button><button type="button" role="tab" id="sgY" class="${statTab === "year" ? "on" : ""}" aria-selected="${statTab === "year"}">年</button></div>
+    ${statTab === "venue" ? list(sorted(venues), "venue") : statTab === "genre" ? (GENRES.some(g => genres[g]) ? GENRES.filter(g => genres[g]).map(g => `<button type="button" class="line" data-k="genre" data-q="${g}"><span>${g}</span><b>${genres[g].n}回${genres[g].spend ? " ・ " + yen(genres[g].spend) : ""} ›</b></button>`).join("") : `<div class="hint">データなし</div>`) : statTab === "year" ? (Object.keys(years).length ? Object.keys(years).sort().reverse().map(y => `<button type="button" class="line" data-k="year" data-q="${y}"><span>${y}年</span><b>${years[y].n}回${years[y].spend ? " ・ " + yen(years[y].spend) : ""} ›</b></button>`).join("") : `<div class="hint">データなし</div>`) : statTab === "pref" ? list(Object.entries(prefs).sort((a, b) => b[1] - a[1] || PREFS.indexOf(a[0]) - PREFS.indexOf(b[0])), "pref") : list(sorted(artists), "artist")}`;
   bindFilter();
   $("#sgA").onclick = () => { statTab = "artist"; renderStats(); };
   $("#sgV").onclick = () => { statTab = "venue"; renderStats(); };
   $("#sgP").onclick = () => { statTab = "pref"; renderStats(); };
+  $("#sgG").onclick = () => { statTab = "genre"; renderStats(); };
   $("#sgY").onclick = () => { statTab = "year"; renderStats(); };
-  document.querySelectorAll("#app .line[data-q]").forEach(b => b.onclick = () => { if(b.dataset.k === "year"){ fYear = b.dataset.q; exact = null; } else exact = {kind: b.dataset.k, value: b.dataset.q}; query = ""; setTab("list", {top: true}); });
+  document.querySelectorAll("#app .line[data-q]").forEach(b => b.onclick = () => { if(b.dataset.k === "year"){ fYear = b.dataset.q; exact = null; } else if(b.dataset.k === "genre"){ fGenre = b.dataset.q; exact = null; } else exact = {kind: b.dataset.k, value: b.dataset.q}; query = ""; setTab("list", {top: true}); });
 }
 
 function renderSettings(){
@@ -611,7 +614,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1021E</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1021G</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
