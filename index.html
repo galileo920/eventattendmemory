@@ -43,7 +43,6 @@ button,input,textarea{font:inherit;color:inherit}
 .bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding-block:12px;padding-left:var(--gutter-l);padding-right:var(--gutter-r)}
 .bar-in{max-width:560px;margin:0 auto;display:flex;align-items:baseline;justify-content:space-between;gap:12px}
 .bar h1{margin:0;font-size:20px;font-weight:700;letter-spacing:.02em}
-.bar .count{font-family:var(--font-mono);font-size:13px;color:var(--sub)}
 .stitle{margin:0 0 14px;font-size:18px;font-weight:700;letter-spacing:.02em}
 main{max-width:560px;margin:0 auto;padding-block:14px 150px;padding-left:var(--gutter-l);padding-right:var(--gutter-r)}
 .toast{position:fixed;z-index:9;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));max-width:min(92vw,420px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,.28)}
@@ -162,13 +161,6 @@ button.line{width:100%;text-align:left;cursor:pointer}
 .prow .grip{flex:0 0 40px;height:46px;margin-top:4px;border:0;background:none;color:var(--sub);font-size:24px;line-height:1;touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none}
 .prow.drag{opacity:.6}
 .prow .rm{flex:0 0 44px;height:46px;margin-top:4px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--sub);font-size:20px;cursor:pointer}
-.chips{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px}
-.chip{min-width:0}
-.chip{position:relative;display:block;margin:0;font-size:inherit;color:inherit;font-weight:inherit}
-.chip input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0;padding:0;cursor:pointer}
-.chip span{display:block;text-align:center;white-space:nowrap;padding:10px 0;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-weight:500}
-.chip input:checked+span{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
-.chip input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 .scan input{display:none}
 .preview{max-width:100%;max-height:180px;border-radius:10px;margin-top:10px;display:block}
@@ -440,13 +432,8 @@ function setTab(t, o = {}){
   window.scrollTo(0, o.top ? 0 : (scrollPos[t] || 0));
   if(o.dir) slideIn(o.dir);
 }
-let tabArmAt = 0;
 document.querySelectorAll(".tabbar button").forEach(b => b.onclick = () => {
   const t = b.dataset.tab, same = !sub && tab === t;
-  if(sub && subKind === "form"){
-    if(Date.now() - tabArmAt < 4000) tabArmAt = 0;
-    else { tabArmAt = Date.now(); showToast("もう一度タブを押すと移動します(入力中の内容は保存されません)"); return; }
-  }
   setTab(t, {top: same});
 });
 let toastTimer = 0;
@@ -618,7 +605,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020Q</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020R</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
@@ -767,12 +754,6 @@ function applyResult(r){
 
 /* ========== 入力フォーム ========== */
 const splitArtists = s => String(s || "").split("、").map(x => x.trim()).filter(Boolean);
-/* 並び順: 記号 → 数字 → 英字 → 日本語(読みの情報がないので、日本語は文字コード順) */
-const sortNames = list => {
-  const key = n => { const t = String(n).normalize("NFKC").replace(/[\u30a1-\u30f6]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60)).trim(), c = t.charAt(0);
-    return [!/[\p{L}\p{N}]/u.test(c) ? 0 : /[0-9]/.test(c) ? 1 : /[A-Za-z]/.test(c) ? 2 : 3, t.toLowerCase()]; };
-  return list.filter(Boolean).map(n => ({n, k: key(n)})).sort((a, b) => a.k[0] - b.k[0] || a.k[1].localeCompare(b.k[1], "ja")).map(o => o.n);
-};
 const kata2hira = s => String(s || "").replace(/[\u30a1-\u30f6]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
 /* 出演者の並び順: 読みのある名前は五十音順。読みが無いものだけ 記号 → 数字 → 英字 → 日本語 の順で後ろに */
 const jaCol = new Intl.Collator("ja");
