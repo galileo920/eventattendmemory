@@ -303,32 +303,44 @@ async function saveAliases(){
   try { localStorage.setItem(ALIAS_LS, JSON.stringify(aliases)); } catch(e){}
   if(typeof store !== "undefined" && store && store.putAlias){ try { await store.putAlias(aliases); } catch(e){} }
 }
+let aliasShow = "";
 function aliasCardHtml(){
-  const rows = ["artist", "venue"].flatMap(k => Object.keys(aliases[k]).map(o => ({k, o, n: aliases[k][o]})));
+  const cnt = k => Object.keys(aliases[k]).length;
+  const rows = aliasShow ? Object.keys(aliases[aliasShow]).map(o => ({k: aliasShow, o, n: aliases[aliasShow][o]})) : [];
   return `<div class="card">
-    <h2>名寄せ(改名・旧名)</h2>
+    <h2>改名・旧名の紐付け</h2>
     <div class="hint">会場や出演者の名前が変わったときに、旧名を現在の名前にまとめます。集計・検索・絞り込みで同じものとして扱います。記録に入力した名前は変わりません。</div>
-    ${rows.length ? rows.map(r => `<div class="alrow"><span class="alk">${r.k === "venue" ? "会場" : "出演者"}</span><span class="aln">${esc(r.o)} → ${esc(r.n)}</span><button type="button" class="alx" data-alk="${r.k}" data-alo="${esc(r.o)}" aria-label="削除">×</button></div>`).join("") : `<div class="hint">登録はありません。</div>`}
     <label for="alKind">種類</label><select id="alKind"><option value="artist">出演者</option><option value="venue">会場</option></select>
-    <label for="alOld">旧名</label><input id="alOld" list="alDl" autocomplete="off">
-    <label for="alNew">現在の名前</label><input id="alNew" list="alDl" autocomplete="off">
-    <datalist id="alDl"></datalist>
+    <label for="alOld">旧名</label><input id="alOld" autocomplete="off">
+    <label for="alNew">現在の名前</label><input id="alNew" autocomplete="off">
     <button class="btn" id="alAdd" type="button" style="margin-top:12px">追加</button>
     <div class="status" id="alSt"></div>
+    <label>登録済み</label>
+    <div class="seg" id="alSeg" role="tablist"><button type="button" data-alv="artist" class="${aliasShow === "artist" ? "on" : ""}">出演者(${cnt("artist")})</button><button type="button" data-alv="venue" class="${aliasShow === "venue" ? "on" : ""}">会場(${cnt("venue")})</button></div>
+    ${aliasShow ? (rows.length ? rows.map(r => `<div class="alrow"><span class="aln">${esc(r.o)} → ${esc(r.n)}</span><button type="button" class="alx" data-alk="${r.k}" data-alo="${esc(r.o)}" aria-label="削除">×</button></div>`).join("") : `<div class="hint">登録はありません。</div>`) : ""}
   </div>`;
 }
 function bindAliasCard(rerender){
-  const fillDl = () => { const k = $("#alKind").value; const ns = [...new Set(lives.flatMap(l => k === "venue" ? (l.venue ? [l.venue] : []) : splitNames(l.artist)))].sort(); $("#alDl").innerHTML = ns.map(n => `<option value="${esc(n)}">`).join(""); };
-  fillDl();
-  $("#alKind").onchange = fillDl;
+  const norm = x => kata2hira(String(x)).toLowerCase().replace(/\s+/g, "");
+  const cands = (field, typed) => {
+    const k = $("#alKind").value, t = norm(typed);
+    if(!t) return [];
+    const m = new Map();
+    lives.forEach(l => (k === "venue" ? (l.venue ? [l.venue] : []) : splitNames(l.artist)).forEach(n0 => { const n = field === "new" ? canon(k, n0) : n0; m.set(n, (m.get(n) || 0) + 1); }));
+    return [...m].filter(([n]) => n !== typed.trim() && norm(n).startsWith(t)).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([name]) => ({name}));
+  };
+  [["#alOld", "old"], ["#alNew", "new"]].forEach(([id, field]) => $(id).addEventListener("input", e => showSugg(e.target, cands(field, e.target.value), c => { e.target.value = c.name; })));
+  $("#alKind").onchange = () => document.querySelectorAll(".sugg").forEach(e => e.remove());
   $("#alAdd").onclick = async () => {
     const k = $("#alKind").value, o = $("#alOld").value.trim(), n = $("#alNew").value.trim(), st = $("#alSt");
+    document.querySelectorAll(".sugg").forEach(e => e.remove());
     const err = m => { st.className = "status err"; st.textContent = m; };
     if(!o || !n) return err("旧名と現在の名前を入力してください。");
     if(o === n) return err("旧名と現在の名前が同じです。");
     if(canon(k, n) === o) return err("逆向きの登録があるため追加できません。");
-    aliases[k][o] = n; await saveAliases(); rerender();
+    aliases[k][o] = n; aliasShow = k; await saveAliases(); rerender();
   };
+  document.querySelectorAll("#alSeg button").forEach(b => b.onclick = () => { aliasShow = aliasShow === b.dataset.alv ? "" : b.dataset.alv; rerender(); });
   document.querySelectorAll("#app .alx").forEach(b => b.onclick = async () => { delete aliases[b.dataset.alk][b.dataset.alo]; await saveAliases(); rerender(); });
 }
 const FIELDS = ["genre","title","artist","venue","pref","date","open","start","seatType","seat","price","setlist"];
@@ -669,7 +681,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ Ver:1.1.0</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ Ver:1.1.1</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
