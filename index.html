@@ -326,7 +326,7 @@ function bindAliasCard(rerender){
     const k = $("#alKind").value, t = norm(typed);
     if(!t) return [];
     const m = new Map();
-    lives.forEach(l => (k === "venue" ? (l.venue ? [l.venue] : []) : splitNames(l.artist)).forEach(n0 => { const n = field === "new" ? canon(k, n0) : n0; m.set(n, (m.get(n) || 0) + 1); }));
+    lives.forEach(l => (k === "venue" ? (l.venue ? [l.venue] : []) : splitNames(l.artist)).forEach(n0 => { const n = n0; m.set(n, (m.get(n) || 0) + 1); }));
     return [...m].filter(([n]) => n !== typed.trim() && norm(n).startsWith(t)).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([name]) => ({name}));
   };
   [["#alOld", "old"], ["#alNew", "new"]].forEach(([id, field]) => $(id).addEventListener("input", e => showSugg(e.target, cands(field, e.target.value), c => { e.target.value = c.name; })));
@@ -681,7 +681,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ Ver:1.1.1</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ Ver:1.1.2</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
