@@ -123,6 +123,8 @@ button.line{width:100%;text-align:left;cursor:pointer}
 .field small{display:block;color:var(--sub);font-size:12px}
 .field div{white-space:pre-wrap;overflow-wrap:anywhere}
 .field.scroll div{max-height:calc(1.55em * 10);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.lk{border:0;background:none;padding:0;font:inherit;color:var(--accent);text-decoration:underline;cursor:pointer;text-align:left;-webkit-tap-highlight-color:transparent}
+.ticket .lk{color:inherit;text-decoration:underline dotted;text-underline-offset:3px}
 .field a{color:var(--accent);text-decoration:underline;word-break:break-all}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
 .card h2{margin:0 0 4px;font-size:15px}
@@ -607,7 +609,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1021A</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1021C</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
@@ -699,6 +701,8 @@ function linkify(text){
     return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a>${esc(tail)}`;
   }).join("");
 }
+const lkBtn = (k, v) => `<button type="button" class="lk" data-lk="${k}" data-q="${esc(v)}">${esc(v)}</button>`;
+const venueLinks = l => l.venue ? lkBtn("venue", l.venue) + (l.pref ? "(" + lkBtn("pref", l.pref) + ")" : "") : (l.pref ? lkBtn("pref", l.pref) : "");
 function openDetail(id){
   closeDial();
   const l = lives.find(x => x.id === id);
@@ -711,9 +715,9 @@ function openDetail(id){
   $("#app").innerHTML = `
     <div class="ticket">
       <div class="a">${esc(l.title || l.artist || "(未入力)")}</div>
-      <div class="m">${fmtDate(l.date)}${venueLabel(l) ? " ／ " + esc(venueLabel(l)) : ""}</div>
+      <div class="m">${fmtDate(l.date)}${venueLabel(l) ? " ／ " + venueLinks(l) : ""}</div>
     </div>
-    ${(() => { const a = (l.artist || "").split("、").map(x => x.trim()).filter(Boolean); return a.length > 10 ? `<div class="field scroll"><small>出演者</small><div tabindex="0">${esc(a.join("\n"))}</div></div>` : row("出演者", a.join("\n")); })()}
+    ${(() => { const a = (l.artist || "").split("、").map(x => x.trim()).filter(Boolean); return a.length > 10 ? `<div class="field scroll"><small>出演者</small><div tabindex="0">${a.map(n => lkBtn("artist", n)).join("\n")}</div></div>` : (a.length ? `<div class="field"><small>出演者</small><div>${a.map(n => lkBtn("artist", n)).join("\n")}</div></div>` : ""); })()}
     ${row("開場 ／ 開演", [l.open, l.start].filter(Boolean).map(fmtTime).join(" ／ "))}
     ${row("席種・券種", l.seatType)}
     ${row("座席・整理番号", l.seat)}
@@ -725,6 +729,7 @@ function openDetail(id){
   `;
   $("#back").onclick = () => setTab("list");
   $("#edit").onclick = () => openForm(l);
+  document.querySelectorAll("#app .lk").forEach(b => b.onclick = () => { fGenre = ""; fYear = ""; exact = {kind: b.dataset.lk, value: b.dataset.q}; query = ""; setTab("list", {top: true}); });
 }
 
 /* 抽出結果(オブジェクト)をフォームに反映 */
