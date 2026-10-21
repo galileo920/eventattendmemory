@@ -279,6 +279,8 @@ const FIELDS = ["genre","title","artist","venue","pref","date","open","start","s
 /* 自動入力・貼り付け取り込みの対象(同行者・セットリスト・メモは手入力のみ) */
 const AUTO_FIELDS = ["genre","title","artist","venue","pref","date","open","start","seatType","seat","price"];
 
+/* 表示用: 時刻の時の0埋めを外す(09:05 → 9:05) */
+const fmtTime = t => String(t || "").replace(/^0(\d:)/, "$1");
 function fmtDate(d){
   if(!d) return "日付未設定";
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d);
@@ -539,7 +541,7 @@ function fillList(){
     const p = dateParts(l.date), y = p ? p.y + "年" : "日付未設定";
     const head = y !== lastY ? `<div class="yhead">${y}</div>` : ""; lastY = y;
     return head + `<div class="stub" role="button" tabindex="0" data-g="${esc(genreOf(l))}" data-id="${esc(l.id)}">
-      <div class="when">${p ? `<span class="y">${p.y}</span><b>${p.m}.${String(p.d).padStart(2, "0")}</b><span class="w">${p.w}</span>${l.start ? `<span class="t">${esc(l.start)}</span>` : ""}` : `<b>--</b>`}</div>
+      <div class="when">${p ? `<span class="y">${p.y}</span><b>${p.m}.${p.d}</b><span class="w">${p.w}</span>${l.start ? `<span class="t">${esc(fmtTime(l.start))}</span>` : ""}` : `<b>--</b>`}</div>
       <div class="what"><div class="who">${esc(l.title || l.artist || "(未入力)")}</div>${l.title && l.artist ? `<div class="ttl">${esc(l.artist)}</div>` : ""}<div class="where">${esc(venueLabel(l))}</div></div>
     </div>`;
   }).join("") : `<div class="empty">${lives.length ? "該当する記録がありません" : "まだ記録がありません。<br>右下の＋から、最初のイベントを追加しましょう"}</div>`;
@@ -605,7 +607,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020S</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ 版: 1020T</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
@@ -712,7 +714,7 @@ function openDetail(id){
       <div class="m">${fmtDate(l.date)}${venueLabel(l) ? " ／ " + esc(venueLabel(l)) : ""}</div>
     </div>
     ${(() => { const a = (l.artist || "").split("、").map(x => x.trim()).filter(Boolean); return a.length > 10 ? `<div class="field scroll"><small>出演者</small><div tabindex="0">${esc(a.join("\n"))}</div></div>` : row("出演者", a.join("\n")); })()}
-    ${row("開場 / 開演", [l.open, l.start].filter(Boolean).join(" / "))}
+    ${row("開場 / 開演", [l.open, l.start].filter(Boolean).map(fmtTime).join(" / "))}
     ${row("席種・券種", l.seatType)}
     ${row("座席・整理番号", l.seat)}
     ${row("チケット代", l.price !== "" && l.price != null ? yen(l.price) : "")}
@@ -1187,7 +1189,7 @@ const B_PILL = {wait: ["待機中", ""], run: ["読み取り中", "run"], ok: ["
 function bSummary(it){
   const f = it.f;
   if(it.status === "ok" || f.title || f.venue){
-    const m = [f.date, [f.venue, f.pref && `(${f.pref})`].filter(Boolean).join("")].filter(Boolean).join(" ／ ");
+    const m = [f.date ? fmtDate(f.date) : "", [f.venue, f.pref && `(${f.pref})`].filter(Boolean).join("")].filter(Boolean).join(" ／ ");
     return {t: f.title || f.artist || "(公演名なし)", m: m || "内容を確認してください"};
   }
   return {t: it.status === "err" ? "読み取れませんでした" : it.status === "run" ? "読み取り中…" : "未読み取り", m: ""};
