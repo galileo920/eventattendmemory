@@ -303,7 +303,7 @@ function aliasCardHtml(){
   const rows = aliasShow ? Object.keys(aliases[aliasShow]).map(o => ({k: aliasShow, o, n: aliases[aliasShow][o]})) : [];
   return `<div class="card">
     <h2>改名・旧名の紐付け</h2>
-    <div class="hint">会場や出演者の名前が変わったときに、旧名を現在の名前にまとめます。集計・検索・絞り込みで同じものとして扱います。記録に入力した名前は変わりません。</div>
+    <div class="hint">会場や出演者の名前が変わったときに、旧名を現在の名前にまとめます。集計・検索・絞り込みで同じものとして扱います。イベントに入力した名前は変わりません。</div>
     <label for="alKind">種類</label><select id="alKind"><option value="artist">出演者</option><option value="venue">会場</option></select>
     <label for="alOld">旧名</label><input id="alOld" autocomplete="off">
     <label for="alNew">現在の名前</label><input id="alNew" autocomplete="off">
@@ -681,7 +681,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ Ver:1.2.3</div>
+    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.2.4</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
@@ -703,7 +703,7 @@ function renderSettings(){
   $("#import").addEventListener("change", importJSON);
   $("#import").addEventListener("input", importJSON);
   $("#wipe").onclick = async () => {
-    if(!confirm("全ての記録を削除します。元に戻せません。よろしいですか?")) return;
+    if(!confirm("全てのイベントを削除します。元に戻せません。よろしいですか?")) return;
     await dbClear(); setAliases({}); await saveAliases(); await refresh(); render(); setDataMsg("ok", "全データを削除しました。", "#wst");
   };
 }
@@ -744,7 +744,7 @@ async function importJSON(e){
     let j;
     try { j = JSON.parse(text.replace(/^\uFEFF/, "")); } catch(e2){ throw new Error("バックアップファイルとして読み取れませんでした(書き出したバックアップファイルを選んでください)"); }
     const arr = Array.isArray(j) ? j : j && j.lives;
-    if(!Array.isArray(arr)) throw new Error("記録のデータが見つかりませんでした");
+    if(!Array.isArray(arr)) throw new Error("イベントのデータが見つかりませんでした");
     if(j && !Array.isArray(j) && j.aliases && typeof j.aliases === "object"){ const ja = j.aliases; setAliases({venue: {...aliases.venue, ...cleanAliasMap(ja.venue)}, artist: {...aliases.artist, ...cleanAliasMap(ja.artist)}}); await saveAliases(); }
     let n = 0;
     for(const r of arr){
@@ -1063,7 +1063,7 @@ function openForm(existing){
   };
   $("#addArtist").onclick = () => { const cur = readRows(); cur.push({name: "", role: ""}); artistRows(cur); const ins = document.querySelectorAll(".f_artist"); ins[ins.length - 1].focus(); };
   if(existing) $("#del").onclick = async () => {
-    if(!confirm("この記録を削除しますか?")) return;
+    if(!confirm("このイベントを削除しますか?")) return;
     await dbDel(existing.id); await refresh(); setTab("list");
   };
 
