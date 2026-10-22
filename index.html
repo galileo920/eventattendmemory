@@ -162,7 +162,6 @@ button.line{width:100%;text-align:left;cursor:pointer}
 .line{display:flex;justify-content:space-between;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:6px}
 .line span{overflow-wrap:anywhere;min-width:0}
 .line b{font-family:var(--font-mono);font-weight:500;white-space:nowrap}
-.segm{margin-top:0}
 .prow{display:flex;gap:8px;align-items:center}
 .prow+.prow{margin-top:6px}
 .prow input{margin-top:4px}
@@ -640,7 +639,7 @@ function renderStats(){
     </div>
     ${gParts ? `<div class="gleg">${gParts.map(p => `<span><i style="--c:${GCOLOR[p.g]}"></i>${esc(p.g)}</span>`).join("")}</div>` : ""}
     <div class="seg" role="tablist"><button type="button" role="tab" id="sgA" class="${statTab === "artist" ? "on" : ""}" aria-selected="${statTab === "artist"}">出演者</button><button type="button" role="tab" id="sgV" class="${statTab === "venue" ? "on" : ""}" aria-selected="${statTab === "venue"}">会場</button><button type="button" role="tab" id="sgP" class="${statTab === "pref" ? "on" : ""}" aria-selected="${statTab === "pref"}">都道府県</button><button type="button" role="tab" id="sgG" class="${statTab === "genre" ? "on" : ""}" aria-selected="${statTab === "genre"}">ジャンル</button><button type="button" role="tab" id="sgY" class="${statTab === "year" ? "on" : ""}" aria-selected="${statTab === "year"}">年</button></div>
-    <div class="seg segm" role="tablist"><button type="button" role="tab" id="smN" class="${statMetric === "n" ? "on" : ""}" aria-selected="${statMetric === "n"}">参加数</button><button type="button" role="tab" id="smS" class="${statMetric === "s" ? "on" : ""}" aria-selected="${statMetric === "s"}">チケット代</button></div>
+    <div class="sortrow" style="justify-content:flex-end"><button type="button" id="metricToggle" aria-label="表示する項目を切り替え">${statMetric === "s" ? "チケット代" : "参加数"} ⇅</button></div>
     ${statTab === "venue" ? list(sorted(venues), "venue") : statTab === "genre" ? (GENRES.some(g => genres[g]) ? GENRES.filter(g => genres[g]).map(g => `<button type="button" class="line" data-k="genre" data-q="${g}"><span>${g}</span>${spLine(genres[g])}</button>`).join("") : `<div class="hint">データなし</div>`) : statTab === "year" ? (Object.keys(years).length ? Object.keys(years).sort().reverse().map(y => `<button type="button" class="line" data-k="year" data-q="${y}"><span>${y}年</span>${spLine(years[y])}</button>`).join("") : `<div class="hint">データなし</div>`) : statTab === "pref" ? list(Object.entries(prefs).sort((a, b) => mv(b[1]) - mv(a[1]) || b[1].n - a[1].n || PREFS.indexOf(a[0]) - PREFS.indexOf(b[0])), "pref") : list(sorted(artists), "artist")}`;
   bindFilter();
   $("#sgA").onclick = () => { statTab = "artist"; renderStats(); };
@@ -648,8 +647,7 @@ function renderStats(){
   $("#sgP").onclick = () => { statTab = "pref"; renderStats(); };
   $("#sgG").onclick = () => { statTab = "genre"; renderStats(); };
   $("#sgY").onclick = () => { statTab = "year"; renderStats(); };
-  $("#smN").onclick = () => { statMetric = "n"; renderStats(); };
-  $("#smS").onclick = () => { statMetric = "s"; renderStats(); };
+  $("#metricToggle").onclick = () => { statMetric = statMetric === "s" ? "n" : "s"; renderStats(); };
   document.querySelectorAll("#app .line[data-q]").forEach(b => b.onclick = () => { if(b.dataset.k === "year"){ fYear = b.dataset.q; exact = null; } else if(b.dataset.k === "genre"){ fGenre = b.dataset.q; exact = null; } else exact = {kind: b.dataset.k, value: b.dataset.q}; query = ""; setTab("list", {top: true}); });
 }
 
@@ -682,7 +680,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ Ver:1.2.0</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ Ver:1.2.2</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
