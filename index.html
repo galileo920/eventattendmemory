@@ -607,7 +607,7 @@ function fillList(){
       <div class="when">${p ? `<span class="y">${p.y}</span><b>${p.m}.${p.d}</b><span class="w">${p.w}</span>${l.start ? `<span class="t">${esc(fmtTime(l.start))}</span>` : ""}` : `<b>--</b>`}</div>
       <div class="what"><div class="who">${esc(l.title || l.artist || "(未入力)")}</div>${l.title && l.artist ? `<div class="ttl">${esc(l.artist)}</div>` : ""}<div class="where">${esc(venueLabel(l))}</div></div>
     </div>`;
-  }).join("") : `<div class="empty">${lives.length ? "該当する記録がありません" : "まだ記録がありません。<br>右下の＋から、最初のイベントを追加しましょう"}</div>`;
+  }).join("") : `<div class="empty">${lives.length ? "該当するイベントがありません" : "まだイベントがありません。<br>右下の＋から、最初のイベントを追加しましょう"}</div>`;
   box.querySelectorAll(".stub").forEach(el => { el.onclick = () => openDetail(el.dataset.id); el.onkeydown = e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); el.click(); } }; });
 }
 
@@ -681,7 +681,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.2.4</div>
+    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.2.5</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
@@ -1017,7 +1017,7 @@ function openForm(existing){
     const venue = venueEl.value.trim();
     if(!venue) return;
     const known = lives.find(z => z.venue === venue && z.pref);
-    if(known){ sel.value = known.pref; sst.className = "status ok"; sst.textContent = `登録済みの記録から「${known.pref}」を入れました。違う場合は選び直してください。`; return; }
+    if(known){ sel.value = known.pref; sst.className = "status ok"; sst.textContent = `登録済みのイベントから「${known.pref}」を入れました。違う場合は選び直してください。`; return; }
     if(!getSet().apiKey) return;
     const my = ++prefSeq, title = $("#f_title") ? $("#f_title").value.trim().replace(/\s*\n\s*/g, " ") : "";
     sst.className = "status"; sst.textContent = "都道府県を調べています…";
@@ -1031,7 +1031,7 @@ function openForm(existing){
   };
   window.__inferPref = inferPref;
   $("#f_venue").addEventListener("change", inferPref);
-  $("#f_venue").addEventListener("input", e => showSugg(e.target, regCands("venue", e.target.value), c => { e.target.value = c.name; if(c.pref){ const sel = $("#f_pref"); if(sel && !sel.value){ sel.value = c.pref; const sst = $("#stPref"); sst.className = "status ok"; sst.textContent = `登録済みの記録から「${c.pref}」を入れました。違う場合は選び直してください。`; } } else inferPref(); }));
+  $("#f_venue").addEventListener("input", e => showSugg(e.target, regCands("venue", e.target.value), c => { e.target.value = c.name; if(c.pref){ const sel = $("#f_pref"); if(sel && !sel.value){ sel.value = c.pref; const sst = $("#stPref"); sst.className = "status ok"; sst.textContent = `登録済みのイベントから「${c.pref}」を入れました。違う場合は選び直してください。`; } } else inferPref(); }));
   const parseArtists = raw => String(raw || "").split(/[、,，\n]/).map(x => x.trim()).filter(Boolean);
   $("#artApply").onclick = () => {
     const sa = $("#stApply"); let add;
