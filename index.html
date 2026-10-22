@@ -458,7 +458,7 @@ let lives = [];
 let query = "", exact = null;
 let sortAsc = false;
 try { sortAsc = localStorage.getItem("livelog_sort") === "asc"; } catch(e){}
-let fGenre = "", fYear = "", statTab = "artist", statMetric = "n";
+let fGenre = "", fYear = "", statTab = "artist", statMetric = "n", statDir = "desc";
 const yearOf = l => (l.date || "").slice(0, 4);
 const filtered = () => lives.filter(l => (!fGenre || genreOf(l) === fGenre) && (!fYear || yearOf(l) === fYear));
 function filterBar(){
@@ -628,8 +628,8 @@ function renderStats(){
     if(l.venue) add(venues, canon("venue", l.venue));
     if(l.pref) add(prefs, l.pref);
   });
-  const mv = e => statMetric === "s" ? e.s : e.n;
-  const sorted = o => Object.entries(o).sort((a, b) => mv(b[1]) - mv(a[1]) || b[1].n - a[1].n || a[0].localeCompare(b[0], "ja"));
+  const mv = e => statMetric === "s" ? (e.s ?? e.spend) : e.n, dr = statDir === "asc" ? -1 : 1;
+  const sorted = o => Object.entries(o).sort((a, b) => (mv(b[1]) - mv(a[1])) * dr || b[1].n - a[1].n || a[0].localeCompare(b[0], "ja"));
   const list = (arr, kind) => arr.length ? arr.map(([k, v]) => `<button type="button" class="line" data-k="${kind}" data-q="${esc(k)}"><span>${esc(k)}</span>${spLine(v)}</button>`).join("") : `<div class="hint">データなし</div>`;
   $("#app").innerHTML = `
     ${filterBar()}
@@ -639,14 +639,15 @@ function renderStats(){
     </div>
     ${gParts ? `<div class="gleg">${gParts.map(p => `<span><i style="--c:${GCOLOR[p.g]}"></i>${esc(p.g)}</span>`).join("")}</div>` : ""}
     <div class="seg" role="tablist"><button type="button" role="tab" id="sgA" class="${statTab === "artist" ? "on" : ""}" aria-selected="${statTab === "artist"}">出演者</button><button type="button" role="tab" id="sgV" class="${statTab === "venue" ? "on" : ""}" aria-selected="${statTab === "venue"}">会場</button><button type="button" role="tab" id="sgP" class="${statTab === "pref" ? "on" : ""}" aria-selected="${statTab === "pref"}">都道府県</button><button type="button" role="tab" id="sgG" class="${statTab === "genre" ? "on" : ""}" aria-selected="${statTab === "genre"}">ジャンル</button><button type="button" role="tab" id="sgY" class="${statTab === "year" ? "on" : ""}" aria-selected="${statTab === "year"}">年</button></div>
-    <div class="sortrow" style="justify-content:flex-end"><button type="button" id="metricToggle" aria-label="表示する項目を切り替え">${statMetric === "s" ? "チケット代" : "参加数"} ⇅</button></div>
-    ${statTab === "venue" ? list(sorted(venues), "venue") : statTab === "genre" ? (GENRES.some(g => genres[g]) ? GENRES.filter(g => genres[g]).map(g => `<button type="button" class="line" data-k="genre" data-q="${g}"><span>${g}</span>${spLine(genres[g])}</button>`).join("") : `<div class="hint">データなし</div>`) : statTab === "year" ? (Object.keys(years).length ? Object.keys(years).sort().reverse().map(y => `<button type="button" class="line" data-k="year" data-q="${y}"><span>${y}年</span>${spLine(years[y])}</button>`).join("") : `<div class="hint">データなし</div>`) : statTab === "pref" ? list(Object.entries(prefs).sort((a, b) => mv(b[1]) - mv(a[1]) || b[1].n - a[1].n || PREFS.indexOf(a[0]) - PREFS.indexOf(b[0])), "pref") : list(sorted(artists), "artist")}`;
+    <div class="sortrow" style="justify-content:flex-end;gap:8px"><button type="button" id="metricToggle" aria-label="表示する項目を切り替え">${statMetric === "s" ? "チケット代" : "参加数"} ⇅</button><button type="button" id="dirToggle" aria-label="並び順を切り替え">${statDir === "asc" ? "少ない順" : "多い順"} ⇅</button></div>
+    ${statTab === "venue" ? list(sorted(venues), "venue") : statTab === "genre" ? (GENRES.some(g => genres[g]) ? GENRES.filter(g => genres[g]).sort((a, b) => (mv(genres[b]) - mv(genres[a])) * dr || GENRES.indexOf(a) - GENRES.indexOf(b)).map(g => `<button type="button" class="line" data-k="genre" data-q="${g}"><span>${g}</span>${spLine(genres[g])}</button>`).join("") : `<div class="hint">データなし</div>`) : statTab === "year" ? (Object.keys(years).length ? Object.keys(years).sort((a, b) => (mv(years[b]) - mv(years[a])) * dr || b.localeCompare(a)).map(y => `<button type="button" class="line" data-k="year" data-q="${y}"><span>${y}年</span>${spLine(years[y])}</button>`).join("") : `<div class="hint">データなし</div>`) : statTab === "pref" ? list(Object.entries(prefs).sort((a, b) => (mv(b[1]) - mv(a[1])) * dr || b[1].n - a[1].n || PREFS.indexOf(a[0]) - PREFS.indexOf(b[0])), "pref") : list(sorted(artists), "artist")}`;
   bindFilter();
   $("#sgA").onclick = () => { statTab = "artist"; renderStats(); };
   $("#sgV").onclick = () => { statTab = "venue"; renderStats(); };
   $("#sgP").onclick = () => { statTab = "pref"; renderStats(); };
   $("#sgG").onclick = () => { statTab = "genre"; renderStats(); };
   $("#sgY").onclick = () => { statTab = "year"; renderStats(); };
+  $("#dirToggle").onclick = () => { statDir = statDir === "asc" ? "desc" : "asc"; renderStats(); };
   $("#metricToggle").onclick = () => { statMetric = statMetric === "s" ? "n" : "s"; renderStats(); };
   document.querySelectorAll("#app .line[data-q]").forEach(b => b.onclick = () => { if(b.dataset.k === "year"){ fYear = b.dataset.q; exact = null; } else if(b.dataset.k === "genre"){ fGenre = b.dataset.q; exact = null; } else exact = {kind: b.dataset.k, value: b.dataset.q}; query = ""; setTab("list", {top: true}); });
 }
@@ -680,7 +681,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ Ver:1.2.2</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ Ver:1.2.3</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
