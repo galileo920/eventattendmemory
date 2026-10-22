@@ -658,7 +658,7 @@ function renderSettings(){
     <div class="card">
       <h2>Gemini API</h2>
       <label>APIキー</label>
-      <input id="key" type="password" autocomplete="off" placeholder="AIza..." value="${esc(s.apiKey || "")}">
+      <input id="key" type="password" autocomplete="off" value="${esc(s.apiKey || "")}">
       <label>モデル</label>
       <input id="model" value="${esc(s.model || DEFAULT_MODEL)}">
       <div class="hint">キーはこの端末のブラウザ内にだけ保存され、画像の読み取り時にGoogle Gemini APIへ直接送信されます。</div>
@@ -681,7 +681,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.2.5</div>
+    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.2.6</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
