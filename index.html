@@ -162,12 +162,7 @@ button.line{width:100%;text-align:left;cursor:pointer}
 .line{display:flex;justify-content:space-between;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:6px}
 .line span{overflow-wrap:anywhere;min-width:0}
 .line b{font-family:var(--font-mono);font-weight:500;white-space:nowrap}
-.line b.sp{display:flex;align-items:baseline}
-.sp i{font-style:normal;display:block}
-.sp .c{min-width:5ch;text-align:right}
-.sp .d{width:2ch;text-align:center}
-.sp .y{min-width:10ch;text-align:right}
-.sp .a{margin-left:.5ch}
+.segm{margin-top:0}
 .prow{display:flex;gap:8px;align-items:center}
 .prow+.prow{margin-top:6px}
 .prow input{margin-top:4px}
@@ -464,7 +459,7 @@ let lives = [];
 let query = "", exact = null;
 let sortAsc = false;
 try { sortAsc = localStorage.getItem("livelog_sort") === "asc"; } catch(e){}
-let fGenre = "", fYear = "", statTab = "artist";
+let fGenre = "", fYear = "", statTab = "artist", statMetric = "n";
 const yearOf = l => (l.date || "").slice(0, 4);
 const filtered = () => lives.filter(l => (!fGenre || genreOf(l) === fGenre) && (!fYear || yearOf(l) === fYear));
 function filterBar(){
@@ -617,7 +612,8 @@ function fillList(){
   box.querySelectorAll(".stub").forEach(el => { el.onclick = () => openDetail(el.dataset.id); el.onkeydown = e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); el.click(); } }; });
 }
 
-const spLine = o => `<b class="sp"><i class="c">${o.n}回</i><i class="d">${o.spend ? "・" : ""}</i><i class="y">${o.spend ? yen(o.spend) : ""}</i><i class="a">›</i></b>`;
+const valTxt = o => statMetric === "s" ? yen(o.s ?? o.spend) : o.n + "回";
+const spLine = o => `<b>${valTxt(o)} ›</b>`;
 function renderStats(){
   const fl = filtered();
   const total = fl.length;
@@ -628,12 +624,14 @@ function renderStats(){
   lives.filter(l => !fYear || yearOf(l) === fYear).forEach(l => { const g = genreOf(l); const o = genres[g] || (genres[g] = {n: 0, spend: 0}); o.n++; o.spend += Number(l.price) || 0; });
   lives.filter(l => !fGenre || genreOf(l) === fGenre).forEach(l => { const y = yearOf(l); if(!y) return; const o = years[y] || (years[y] = {n: 0, spend: 0}); o.n++; o.spend += Number(l.price) || 0; });
   fl.forEach(l => {
-    canonArtists(l).forEach(a => { artists[a] = (artists[a] || 0) + 1; });
-    if(l.venue){ const v = canon("venue", l.venue); venues[v] = (venues[v] || 0) + 1; }
-    if(l.pref) prefs[l.pref] = (prefs[l.pref] || 0) + 1;
+    const pr = Number(l.price) || 0, add = (o, k) => { const e = o[k] || (o[k] = {n: 0, s: 0}); e.n++; e.s += pr; };
+    canonArtists(l).forEach(a => add(artists, a));
+    if(l.venue) add(venues, canon("venue", l.venue));
+    if(l.pref) add(prefs, l.pref);
   });
-  const sorted = o => Object.entries(o).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ja"));
-  const list = (arr, kind) => arr.length ? arr.map(([k, v]) => `<button type="button" class="line" data-k="${kind}" data-q="${esc(k)}"><span>${esc(k)}</span><b>${v}回 ›</b></button>`).join("") : `<div class="hint">データなし</div>`;
+  const mv = e => statMetric === "s" ? e.s : e.n;
+  const sorted = o => Object.entries(o).sort((a, b) => mv(b[1]) - mv(a[1]) || b[1].n - a[1].n || a[0].localeCompare(b[0], "ja"));
+  const list = (arr, kind) => arr.length ? arr.map(([k, v]) => `<button type="button" class="line" data-k="${kind}" data-q="${esc(k)}"><span>${esc(k)}</span>${spLine(v)}</button>`).join("") : `<div class="hint">データなし</div>`;
   $("#app").innerHTML = `
     ${filterBar()}
     <div class="stats">
@@ -642,13 +640,16 @@ function renderStats(){
     </div>
     ${gParts ? `<div class="gleg">${gParts.map(p => `<span><i style="--c:${GCOLOR[p.g]}"></i>${esc(p.g)}</span>`).join("")}</div>` : ""}
     <div class="seg" role="tablist"><button type="button" role="tab" id="sgA" class="${statTab === "artist" ? "on" : ""}" aria-selected="${statTab === "artist"}">出演者</button><button type="button" role="tab" id="sgV" class="${statTab === "venue" ? "on" : ""}" aria-selected="${statTab === "venue"}">会場</button><button type="button" role="tab" id="sgP" class="${statTab === "pref" ? "on" : ""}" aria-selected="${statTab === "pref"}">都道府県</button><button type="button" role="tab" id="sgG" class="${statTab === "genre" ? "on" : ""}" aria-selected="${statTab === "genre"}">ジャンル</button><button type="button" role="tab" id="sgY" class="${statTab === "year" ? "on" : ""}" aria-selected="${statTab === "year"}">年</button></div>
-    ${statTab === "venue" ? list(sorted(venues), "venue") : statTab === "genre" ? (GENRES.some(g => genres[g]) ? GENRES.filter(g => genres[g]).map(g => `<button type="button" class="line" data-k="genre" data-q="${g}"><span>${g}</span>${spLine(genres[g])}</button>`).join("") : `<div class="hint">データなし</div>`) : statTab === "year" ? (Object.keys(years).length ? Object.keys(years).sort().reverse().map(y => `<button type="button" class="line" data-k="year" data-q="${y}"><span>${y}年</span>${spLine(years[y])}</button>`).join("") : `<div class="hint">データなし</div>`) : statTab === "pref" ? list(Object.entries(prefs).sort((a, b) => b[1] - a[1] || PREFS.indexOf(a[0]) - PREFS.indexOf(b[0])), "pref") : list(sorted(artists), "artist")}`;
+    <div class="seg segm" role="tablist"><button type="button" role="tab" id="smN" class="${statMetric === "n" ? "on" : ""}" aria-selected="${statMetric === "n"}">参加数</button><button type="button" role="tab" id="smS" class="${statMetric === "s" ? "on" : ""}" aria-selected="${statMetric === "s"}">チケット代</button></div>
+    ${statTab === "venue" ? list(sorted(venues), "venue") : statTab === "genre" ? (GENRES.some(g => genres[g]) ? GENRES.filter(g => genres[g]).map(g => `<button type="button" class="line" data-k="genre" data-q="${g}"><span>${g}</span>${spLine(genres[g])}</button>`).join("") : `<div class="hint">データなし</div>`) : statTab === "year" ? (Object.keys(years).length ? Object.keys(years).sort().reverse().map(y => `<button type="button" class="line" data-k="year" data-q="${y}"><span>${y}年</span>${spLine(years[y])}</button>`).join("") : `<div class="hint">データなし</div>`) : statTab === "pref" ? list(Object.entries(prefs).sort((a, b) => mv(b[1]) - mv(a[1]) || b[1].n - a[1].n || PREFS.indexOf(a[0]) - PREFS.indexOf(b[0])), "pref") : list(sorted(artists), "artist")}`;
   bindFilter();
   $("#sgA").onclick = () => { statTab = "artist"; renderStats(); };
   $("#sgV").onclick = () => { statTab = "venue"; renderStats(); };
   $("#sgP").onclick = () => { statTab = "pref"; renderStats(); };
   $("#sgG").onclick = () => { statTab = "genre"; renderStats(); };
   $("#sgY").onclick = () => { statTab = "year"; renderStats(); };
+  $("#smN").onclick = () => { statMetric = "n"; renderStats(); };
+  $("#smS").onclick = () => { statMetric = "s"; renderStats(); };
   document.querySelectorAll("#app .line[data-q]").forEach(b => b.onclick = () => { if(b.dataset.k === "year"){ fYear = b.dataset.q; exact = null; } else if(b.dataset.k === "genre"){ fGenre = b.dataset.q; exact = null; } else exact = {kind: b.dataset.k, value: b.dataset.q}; query = ""; setTab("list", {top: true}); });
 }
 
@@ -681,7 +682,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ Ver:1.1.8</div>
+    <div class="hint" style="text-align:center">記録件数: ${lives.length} ／ Ver:1.2.0</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
