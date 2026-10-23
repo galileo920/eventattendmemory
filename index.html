@@ -408,7 +408,7 @@ function setupPhotos(l){
 function photoGalleryHtml(l){
   const ps = photoList(l);
   if(!ps.length) return "";
-  return `<div class="pgal">${ps.map((p, i) => `<div class="pfr"><img src="${p}" alt="イベント画像${i + 1}" data-pi="${i}"></div>`).join("")}</div>${ps.length > 1 ? `<div class="pdots">${ps.map((_, i) => `<i class="${i ? "" : "on"}"></i>`).join("")}</div>` : ""}<div style="height:10px"></div>`;
+  return `<div class="pgal${ps.length > 1 ? " multi" : ""}">${ps.map((p, i) => `<div class="pfr"><img src="${p}" alt="イベント画像${i + 1}" data-pi="${i}"></div>`).join("")}</div>${ps.length > 1 ? `<div class="pdots">${ps.map((_, i) => `<i class="${i ? "" : "on"}"></i>`).join("")}</div>` : ""}<div style="height:10px"></div>`;
 }
 function openLightbox(src){
   const o = document.createElement("div"); o.className = "plbx";
@@ -613,7 +613,7 @@ function onSwipe(dx){
     on = false;
     if(e.touches.length !== 1) return;
     const el = e.target;
-    if(el && el.closest && el.closest("input,textarea,select,a,.grip,.field.scroll,.pgal,.plbx")) return;
+    if(el && el.closest && el.closest("input,textarea,select,a,.grip,.field.scroll,.pgal.multi,.plbx")) return;
     const t = e.touches[0]; sx = t.clientX; sy = t.clientY; t0 = Date.now(); on = true;
   }, {passive: true});
   document.addEventListener("touchend", e => {
@@ -765,7 +765,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.3.1</div>
+    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.3.2</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
