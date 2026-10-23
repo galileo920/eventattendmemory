@@ -421,7 +421,16 @@ function bindPhotoGallery(l){
   const g = document.querySelector("#app .pgal");
   if(g) g.addEventListener("scroll", () => { const i = Math.round(g.scrollLeft / g.clientWidth); document.querySelectorAll("#app .pdots i").forEach((d, x) => d.classList.toggle("on", x === i)); });
 }
-const FIELDS = ["genre","title","artist","venue","pref","date","open","start","seatType","seat","price","setlist"];
+/* タグ(ジャンルより細かい属性。「、」区切りで複数) */
+const splitTags = s => [...new Set(String(s || "").split(/[、,，]/).map(x => x.trim()).filter(Boolean))];
+function tagCands(typed, skip){
+  const norm = x => kata2hira(String(x)).toLowerCase().replace(/\s+/g, "");
+  const t = norm(typed); if(!t) return [];
+  const m = new Map();
+  lives.forEach(l => splitTags(l.tags).forEach(n => { if(!(skip || []).includes(n) && norm(n).includes(t)) m.set(n, (m.get(n) || 0) + 1); }));
+  return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ja")).slice(0, 6).map(([name]) => ({name, pref: ""}));
+}
+const FIELDS = ["genre","title","artist","venue","pref","date","open","start","seatType","seat","price","setlist","tags"];
 /* 自動入力・貼り付け取り込みの対象(同行者・セットリスト・メモは手入力のみ) */
 const AUTO_FIELDS = ["genre","title","artist","venue","pref","date","open","start","seatType","seat","price"];
 
@@ -660,7 +669,7 @@ function renderList(){
     <div class="cw sw"><input class="search" id="q" type="search" placeholder="公演名・出演者・会場で検索" value="${esc(query)}"><button type="button" class="cx" data-clr="q" aria-label="クリア">×</button></div>
     ${filterBar()}
     <div class="sortrow"><span class="cnt" id="listCnt"></span><button type="button" id="sortToggle" aria-label="並び順を切り替え">${sortAsc ? "古い順" : "新しい順"} ⇅</button></div>
-    ${exact ? `<div class="exact"><span>${exact.kind === "venue" ? "会場" : exact.kind === "pref" ? "都道府県" : "出演者"}「${esc(exact.value)}」と完全一致${exact.kind !== "pref" && aliasNames(exact.kind, exact.value).length > 1 ? "(旧名を含む)" : ""}</span><button type="button" id="exOff">解除</button></div>` : ""}
+    ${exact ? `<div class="exact"><span>${exact.kind === "venue" ? "会場" : exact.kind === "pref" ? "都道府県" : exact.kind === "tag" ? "タグ" : "出演者"}「${esc(exact.value)}」と完全一致${exact.kind !== "pref" && exact.kind !== "tag" && aliasNames(exact.kind, exact.value).length > 1 ? "(旧名を含む)" : ""}</span><button type="button" id="exOff">解除</button></div>` : ""}
     <div id="listBody"></div>
   `;
   bindFilter();
@@ -677,8 +686,8 @@ function renderList(){
 function fillList(){
   const q = query.trim().toLowerCase();
   const rows = filtered()
-    .filter(l => !exact || (exact.kind === "venue" ? canon("venue", l.venue) === exact.value : exact.kind === "pref" ? l.pref === exact.value : canonArtists(l).includes(exact.value)))
-    .filter(l => !q || ["title","artist","venue"].some(f => String(l[f] ?? "").toLowerCase().includes(q)) || aliasHay(l).includes(q))
+    .filter(l => !exact || (exact.kind === "venue" ? canon("venue", l.venue) === exact.value : exact.kind === "pref" ? l.pref === exact.value : exact.kind === "tag" ? splitTags(l.tags).includes(exact.value) : canonArtists(l).includes(exact.value)))
+    .filter(l => !q || ["title","artist","venue","tags"].some(f => String(l[f] ?? "").toLowerCase().includes(q)) || aliasHay(l).includes(q))
     .sort((a, b) => { const x = a.date || "", y = b.date || ""; if(!x || !y) return (x ? 0 : 1) - (y ? 0 : 1); if(x !== y) return sortAsc ? x.localeCompare(y) : y.localeCompare(x); const s = a.start || a.open || "", t = b.start || b.open || ""; if(s === t) return 0; if(!s || !t) return s ? -1 : 1; return sortAsc ? s.localeCompare(t) : t.localeCompare(s); });
   const box = $("#listBody");
   if(!box) return;
@@ -765,7 +774,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.3.2</div>
+    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.4.0</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
@@ -883,6 +892,7 @@ function openDetail(id){
     ${row("チケット代", l.price !== "" && l.price != null ? yen(l.price) : "")}
     ${row("ジャンル", genreOf(l))}
     ${(() => { const t = String(l.setlist || "").trim(); return t ? `<div class="field"><small>詳細</small><div>${linkify(t)}</div></div>` : ""; })()}
+    ${(() => { const g = splitTags(l.tags); return g.length ? `<div class="field"><small>タグ</small><div>${g.map(n => lkBtn("tag", n)).join("、")}</div></div>` : ""; })()}
     <div class="bend"><button class="btn sec" id="back">戻る</button><button class="btn" id="edit">編集</button></div>
   `;
   bindPhotoGallery(l);
@@ -1088,6 +1098,8 @@ function openForm(existing){
       <div class="lh"><label>チケット代</label></div><div class="cw"><input id="f_price" placeholder=" " type="number" inputmode="numeric" value="${v("price")}"><button type="button" class="cx" data-clr="f_price" aria-label="クリア">×</button></div>
       <label>ジャンル</label><select id="f_genre">${GENRES.map(g => `<option${genreOf(l) === g ? " selected" : ""}>${g}</option>`).join("")}</select>
       <div class="lh"><label>詳細</label></div><div class="cw"><textarea id="f_setlist" inputmode="url" autocapitalize="off" autocomplete="off" placeholder="URLを入力(複数のときは改行で区切る)" style="min-height:96px">${v("setlist")}</textarea><button type="button" class="cx" data-clr="f_setlist" aria-label="クリア">×</button></div>
+      <div class="lh"><label for="f_tags">タグ</label></div><div class="cw"><input id="f_tags" placeholder=" " autocomplete="off" value="${v("tags")}"><button type="button" class="cx" data-clr="f_tags" aria-label="クリア">×</button></div>
+      <div class="hint">ジャンルより細かい属性を、「、」で区切って複数入力できます(例: バンド、アイドル)</div>
     </div>
     ${photoCardHtml()}
     ${existing ? `<button class="btn danger" id="del">削除</button>` : ""}
@@ -1116,6 +1128,7 @@ function openForm(existing){
   };
   window.__inferPref = inferPref;
   $("#f_venue").addEventListener("change", inferPref);
+  $("#f_tags").addEventListener("input", e => { const el = e.target, v = el.value, i = Math.max(v.lastIndexOf("、"), v.lastIndexOf(","), v.lastIndexOf("，")), head = v.slice(0, i + 1); showSugg(el, tagCands(v.slice(i + 1), splitTags(head)), c => { el.value = head + c.name; }); });
   $("#f_venue").addEventListener("input", e => showSugg(e.target, regCands("venue", e.target.value), c => { e.target.value = c.name; if(c.pref){ const sel = $("#f_pref"); if(sel && !sel.value){ sel.value = c.pref; const sst = $("#stPref"); sst.className = "status ok"; sst.textContent = `登録済みのイベントから「${c.pref}」を入れました。違う場合は選び直してください。`; } } else inferPref(); }));
   const parseArtists = raw => String(raw || "").split(/[、,，\n]/).map(x => x.trim()).filter(Boolean);
   $("#artApply").onclick = () => {
@@ -1294,6 +1307,7 @@ ${RULES}`;
   const getPhotos = setupPhotos(l);
   $("#save").onclick = async () => {
     FIELDS.forEach(k => { if(k !== "artist" && k !== "genre") l[k] = $("#f_" + k).value.trim(); });
+    l.tags = splitTags(l.tags).join("、");
     l.genre = $("#f_genre").value || "音楽";
     l.title = l.title.replace(/\s*\n\s*/g, " ");
     l.artist = readArtists().filter(Boolean).join("、");
