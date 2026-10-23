@@ -76,6 +76,12 @@ textarea{resize:vertical;min-height:84px}
 input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display:none}
 label{display:block;margin-top:14px;font-size:13px;color:var(--sub);font-weight:500}
 .sortrow{display:flex;justify-content:space-between;align-items:center;margin:-2px 0 4px}
+.sortrow .grp{display:flex;gap:8px}
+.stub .bchk{flex:none;display:flex;align-items:center;padding:0 14px 0 2px}
+.stub .bchk i{width:24px;height:24px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;color:var(--accent-ink);font-style:normal;font-size:14px;line-height:1;background:var(--surface)}
+.stub.sel{border-color:var(--accent);background:var(--accent-soft)}
+.stub.sel .bchk i{background:var(--accent);border-color:var(--accent)}
+.stub.sel .bchk i::after{content:"✓"}
 .sortrow .cnt{font-size:13px;color:var(--sub)}
 .sortrow button{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:500;cursor:pointer}
 .sugg{border:1px solid var(--line);border-radius:10px;background:var(--surface);margin-top:4px;overflow:hidden}
@@ -581,6 +587,7 @@ document.addEventListener("click", e => { const b = e.target.closest && e.target
 let dataMsg = null;
 function setDataMsg(cls, text, id){ id = id || "#dst"; dataMsg = {cls, text, id}; const d = $(id); if(d){ d.className = "status " + cls; d.textContent = text; } }
 function setTab(t, o = {}){
+  if(!o.keepBulk) bulk = false;
   if(t !== tab || sub) dataMsg = null;
   saveScroll();
   sub = false;
@@ -601,6 +608,7 @@ function showToast(msg){ const t = $("#toast"); t.textContent = msg; t.hidden = 
 let formBackAt = 0, subKind = "", subBack = null;
 function onSwipe(dx){
   if(!sub){
+    if(bulk) return;
     const i = TABS.indexOf(tab), j = dx < 0 ? i + 1 : i - 1;
     if(j < 0 || j >= TABS.length) return;
     setTab(TABS[j], {dir: dx < 0 ? "l" : "r"});
@@ -647,6 +655,7 @@ $("#dialPhoto").onclick = () => { closeDial(); openBatch(); };
 let subEdit = false;
 function screenTitle(){
   if(sub && subKind === "batch") return "参加イベント一括登録";
+  if(sub && subKind === "bulk") return "一括編集";
   if(sub) return subKind === "detail" ? "参加イベント詳細" : subEdit ? "参加イベント編集" : "参加イベント登録";
   return tab === "stats" ? "参加イベント集計" : tab === "settings" ? "データ管理" : "参加イベント一覧";
 }
@@ -666,17 +675,88 @@ function dateParts(d){
   if(!m) return null;
   return {y:m[1], m:+m[2], d:+m[3], w:"日月火水木金土"[new Date(+m[1], +m[2]-1, +m[3]).getDay()]}
 }
+/* ---------- 一括編集(会場名は置き換え、タグは追加) ---------- */
+let bulk = false, bulkVisible = [];
+const bulkSel = new Set();
+function bulkSync(){
+  if(!bulk) return;
+  const n = bulkSel.size, g = $("#bulkGo"), a = $("#bulkAll");
+  if(g){ g.disabled = !n; g.textContent = n ? `編集(${n}件)` : "編集"; }
+  if(a) a.textContent = bulkVisible.length && bulkVisible.every(i => bulkSel.has(i)) ? "選択解除" : "全選択";
+}
+function bulkToggle(el){
+  const id = el.dataset.id;
+  if(bulkSel.has(id)) bulkSel.delete(id); else bulkSel.add(id);
+  el.classList.toggle("sel", bulkSel.has(id));
+  bulkSync();
+}
+async function bulkRun(ids, venue, tags){
+  const add = splitTags(tags); let n = 0;
+  for(const id of ids){
+    const l = lives.find(x => x.id === id); if(!l) continue;
+    const m = {...l}; let ch = false;
+    if(venue && m.venue !== venue){ m.venue = venue; ch = true; }
+    if(add.length){ const cur = splitTags(m.tags), nx = splitTags(cur.concat(add).join("、")); if(nx.length !== cur.length){ m.tags = nx.join("、"); ch = true; } }
+    if(ch){ m.updatedAt = Date.now(); await bulkPut(m); n++; }
+  }
+  return n;
+}
+function bulkEditHtml(n){
+  return `<div class="card" style="margin-top:12px">
+      <div class="hint">選んだ${n}件のイベントに反映します。空欄の項目は変更しません。</div>
+      <div class="lh"><label for="bk_venue">会場名(入力した内容に置き換えます)</label></div><div class="cw"><input id="bk_venue" placeholder=" " autocomplete="off"><button type="button" class="cx" data-clr="bk_venue" aria-label="クリア">×</button></div>
+      <div class="lh"><label for="bk_tags">タグ(いま付いているタグは残して、追加します)</label></div><div class="cw"><input id="bk_tags" placeholder=" " autocomplete="off"><button type="button" class="cx" data-clr="bk_tags" aria-label="クリア">×</button></div>
+      <div class="hint">タグは「、」で区切って複数入力できます</div>
+    </div>
+    <div class="bbar"><div class="bbar-in"><button type="button" class="btn sec" id="bkCancel">キャンセル</button><button type="button" class="btn" id="bkGo">更新</button></div></div>`;
+}
+function bindBulkEdit(ids){
+  const vi = $("#bk_venue"), ti = $("#bk_tags");
+  vi.addEventListener("input", e => showSugg(e.target, regCands("venue", e.target.value), c => { e.target.value = c.name; }));
+  ti.addEventListener("input", e => { const el = e.target, v = el.value, i = Math.max(v.lastIndexOf("、"), v.lastIndexOf(","), v.lastIndexOf("，")), head = v.slice(0, i + 1); showSugg(el, tagCands(v.slice(i + 1), splitTags(head)), c => { el.value = head + c.name; }); });
+  $("#bkCancel").onclick = () => bulkBack();
+  $("#bkGo").onclick = async e => {
+    const btn = e.currentTarget, venue = vi.value.trim(), add = splitTags(ti.value);
+    if(!venue && !add.length){ alert("会場名かタグを入力してください"); return; }
+    const lines = []; if(venue) lines.push(`・会場名を「${venue}」に置き換え`); if(add.length) lines.push(`・タグ「${add.join("、")}」を追加`);
+    if(!confirm(`選んだ${ids.length}件のイベントを更新します。\n${lines.join("\n")}\nよろしいですか?`)) return;
+    btn.disabled = true;
+    let n = 0;
+    try { n = await bulkRun(ids, venue, ti.value); }
+    catch(err){ await bulkAfter(); btn.disabled = false; alert("更新できませんでした。時間をおいて、もう一度お試しください。"); return; }
+    await bulkAfter();
+    bulkDone();
+    showToast(n ? `${n}件を更新しました` : "変更はありませんでした");
+  };
+}
+const bulkPut = m => dbPut(m);
+const bulkAfter = () => refresh();
+const bulkBack = () => setTab("list", {keepBulk: true});
+const bulkDone = () => { bulk = false; bulkSel.clear(); setTab("list"); };
+function openBulkEdit(){
+  const ids = [...bulkSel]; if(!ids.length) return;
+  saveScroll(); sub = true; subKind = "bulk"; subEdit = false;
+  window.scrollTo(0, 0);
+  $("#fab").style.display = "none"; document.querySelector(".tabbar").hidden = true;
+  $("#app").innerHTML = bulkEditHtml(ids.length);
+  bindBulkEdit(ids);
+}
 function renderList(){
+  $("#fab").style.display = bulk ? "none" : ""; document.querySelector(".tabbar").hidden = bulk;
   $("#app").innerHTML = `
     <div class="cw sw"><input class="search" id="q" type="search" placeholder="公演名・出演者・会場・タグで検索" value="${esc(query)}"><button type="button" class="cx" data-clr="q" aria-label="クリア">×</button></div>
     ${filterBar()}
-    <div class="sortrow"><span class="cnt" id="listCnt"></span><button type="button" id="sortToggle" aria-label="並び順を切り替え">${sortAsc ? "古い順" : "新しい順"} ⇅</button></div>
+    <div class="sortrow"><span class="cnt" id="listCnt"></span><span class="grp">${bulk ? `<button type="button" id="bulkAll">全選択</button>` : `<button type="button" id="bulkBtn">一括編集</button>`}<button type="button" id="sortToggle" aria-label="並び順を切り替え">${sortAsc ? "古い順" : "新しい順"} ⇅</button></span></div>
     ${exact ? `<div class="exact"><span>${exact.kind === "venue" ? "会場" : exact.kind === "pref" ? "都道府県" : exact.kind === "tag" ? "タグ" : "出演者"}「${esc(exact.value)}」と完全一致${exact.kind !== "pref" && exact.kind !== "tag" && aliasNames(exact.kind, exact.value).length > 1 ? "(旧名を含む)" : ""}</span><button type="button" id="exOff">解除</button></div>` : ""}
-    <div id="listBody"></div>
+    <div id="listBody"></div>${bulk ? `<div class="bbar"><div class="bbar-in"><button type="button" class="btn sec" id="bulkCancel">キャンセル</button><button type="button" class="btn" id="bulkGo">編集</button></div></div>` : ""}
   `;
   bindFilter();
   $("#sortToggle").onclick = e => { sortAsc = !sortAsc; try { localStorage.setItem("livelog_sort", sortAsc ? "asc" : "desc"); } catch(err){} e.currentTarget.textContent = (sortAsc ? "古い順" : "新しい順") + " ⇅"; fillList(); };
   if(exact) $("#exOff").onclick = () => { exact = null; renderList(); };
+  if($("#bulkBtn")) $("#bulkBtn").onclick = () => { bulk = true; bulkSel.clear(); renderList(); };
+  if($("#bulkAll")) $("#bulkAll").onclick = () => { const all = bulkVisible.length && bulkVisible.every(i => bulkSel.has(i)); bulkVisible.forEach(i => { if(all) bulkSel.delete(i); else bulkSel.add(i); }); fillList(); };
+  if($("#bulkCancel")) $("#bulkCancel").onclick = () => { bulk = false; bulkSel.clear(); renderList(); };
+  if($("#bulkGo")) $("#bulkGo").onclick = () => openBulkEdit();
   fillList();
   const qi = $("#q");
   let comp = false;
@@ -694,16 +774,19 @@ function fillList(){
   const box = $("#listBody");
   if(!box) return;
   const cn = $("#listCnt"); if(cn) cn.textContent = rows.length + "件";
+  bulkVisible = rows.map(l => l.id);
+  if(bulk) [...bulkSel].forEach(i => { if(!bulkVisible.includes(i)) bulkSel.delete(i); }); /* 絞り込みで見えなくなったものは選択から外す */
   let lastY = null;
   box.innerHTML = rows.length ? rows.map(l => {
     const p = dateParts(l.date), y = p ? p.y + "年" : "日付未設定";
     const head = y !== lastY ? `<div class="yhead">${y}</div>` : ""; lastY = y;
-    return head + `<div class="stub" role="button" tabindex="0" data-g="${esc(genreOf(l))}" data-id="${esc(l.id)}">
+    return head + `<div class="stub${bulk && bulkSel.has(l.id) ? " sel" : ""}" role="button" tabindex="0" data-g="${esc(genreOf(l))}" data-id="${esc(l.id)}">
       <div class="when">${p ? `<span class="y">${p.y}</span><b>${p.m}.${p.d}</b><span class="w">${p.w}</span>${l.start ? `<span class="t">${esc(fmtTime(l.start))}</span>` : ""}` : `<b>--</b>`}</div>
-      <div class="what"><div class="who">${esc(l.title || l.artist || "(未入力)")}</div>${l.title && l.artist ? `<div class="ttl">${esc(l.artist)}</div>` : ""}<div class="where">${esc(venueLabel(l))}</div></div>
+      <div class="what"><div class="who">${esc(l.title || l.artist || "(未入力)")}</div>${l.title && l.artist ? `<div class="ttl">${esc(l.artist)}</div>` : ""}<div class="where">${esc(venueLabel(l))}</div></div>${bulk ? `<span class="bchk"><i></i></span>` : ""}
     </div>`;
   }).join("") : `<div class="empty">${lives.length ? "該当するイベントがありません" : "まだイベントがありません。<br>右下の＋から、最初のイベントを追加しましょう"}</div>`;
-  box.querySelectorAll(".stub").forEach(el => { el.onclick = () => openDetail(el.dataset.id); el.onkeydown = e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); el.click(); } }; });
+  bulkSync();
+  box.querySelectorAll(".stub").forEach(el => { el.onclick = () => { if(bulk) bulkToggle(el); else openDetail(el.dataset.id); }; el.onkeydown = e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); el.click(); } }; });
 }
 
 const valTxt = o => statMetric === "s" ? yen(o.s ?? o.spend) : o.n + "回";
@@ -776,7 +859,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.5.0</div>
+    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.6.0</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
