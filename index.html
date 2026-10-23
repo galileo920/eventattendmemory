@@ -666,7 +666,7 @@ function dateParts(d){
 }
 function renderList(){
   $("#app").innerHTML = `
-    <div class="cw sw"><input class="search" id="q" type="search" placeholder="公演名・出演者・会場で検索" value="${esc(query)}"><button type="button" class="cx" data-clr="q" aria-label="クリア">×</button></div>
+    <div class="cw sw"><input class="search" id="q" type="search" placeholder="公演名・出演者・会場・タグで検索" value="${esc(query)}"><button type="button" class="cx" data-clr="q" aria-label="クリア">×</button></div>
     ${filterBar()}
     <div class="sortrow"><span class="cnt" id="listCnt"></span><button type="button" id="sortToggle" aria-label="並び順を切り替え">${sortAsc ? "古い順" : "新しい順"} ⇅</button></div>
     ${exact ? `<div class="exact"><span>${exact.kind === "venue" ? "会場" : exact.kind === "pref" ? "都道府県" : exact.kind === "tag" ? "タグ" : "出演者"}「${esc(exact.value)}」と完全一致${exact.kind !== "pref" && exact.kind !== "tag" && aliasNames(exact.kind, exact.value).length > 1 ? "(旧名を含む)" : ""}</span><button type="button" id="exOff">解除</button></div>` : ""}
@@ -774,7 +774,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.4.1</div>
+    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.4.2</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
@@ -870,7 +870,7 @@ async function importJSON(e){
       n++;
     }
     await refresh(); render();
-    setDataMsg("ok", `${n}件を読み込みました(追加${n - st.f - st.s}件・補完${st.f}件・変更なし${st.s}件)。`);
+    setDataMsg("ok", `${n}件を読み込みました(追加${n - st.f - st.s}件・更新${st.f}件・変更なし${st.s}件)。`);
   } catch(err){ setDataMsg("err", "読み込めませんでした。" + ((err && err.message && !/^(Failed|Unexpected|Cannot)/.test(err.message)) ? err.message : "ファイルを確認してください。")); }
   e.target.value = "";
   importBusy = false;
@@ -903,7 +903,7 @@ function openDetail(id){
       <div class="m">${fmtDate(l.date)}${venueLabel(l) ? " ／ " + venueLinks(l) : ""}</div>
     </div>
     ${(() => { const a = (l.artist || "").split("、").map(x => x.trim()).filter(Boolean); return a.length > 10 ? `<div class="field scroll"><small>出演者</small><div tabindex="0">${a.map(n => lkBtn("artist", n)).join("\n")}</div></div>` : (a.length ? `<div class="field"><small>出演者</small><div>${a.map(n => lkBtn("artist", n)).join("\n")}</div></div>` : ""); })()}
-    ${row("開場 ／ 開演", [l.open, l.start].filter(Boolean).map(fmtTime).join(" ／ "))}
+    ${row(genreOf(l) === "スポーツ" ? "開場 ／ 開始" : "開場 ／ 開演", [l.open, l.start].filter(Boolean).map(fmtTime).join(" ／ "))}
     ${row("席種・券種", l.seatType)}
     ${row("座席・整理番号", l.seat)}
     ${row("チケット代", l.price !== "" && l.price != null ? yen(l.price) : "")}
