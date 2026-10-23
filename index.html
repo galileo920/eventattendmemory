@@ -301,8 +301,10 @@ try { setAliases(JSON.parse(localStorage.getItem(ALIAS_LS) || "{}")); } catch(e)
 const canon = (kind, name) => { const m = aliases[kind] || {}; let n = String(name || "").trim(), i = 0; while(Object.prototype.hasOwnProperty.call(m, n) && i++ < 20) n = m[n]; return n; };
 const aliasNames = (kind, name) => { const c = canon(kind, name); return [c].concat(Object.keys(aliases[kind] || {}).filter(k => canon(kind, k) === c)); };
 const splitNames = s => String(s || "").split(/[、,，]/).map(x => x.trim()).filter(Boolean);
-const canonArtists = l => [...new Set(splitNames(l.artist).map(a => canon("artist", a)))];
-const aliasHay = l => [].concat(l.venue ? aliasNames("venue", l.venue) : [], ...splitNames(l.artist).map(a => aliasNames("artist", a))).join("\n").toLowerCase();
+/* 出演者は配列(artists)で持つ。artist(文字列)は表示・検索・CSV用に「、」でつないだもの。古いデータ(artistsなし)は「、」で分けて読む */
+const artistsOf = l => Array.isArray(l && l.artists) ? l.artists.map(x => String(x).trim()).filter(Boolean) : splitNames(l && l.artist);
+const canonArtists = l => [...new Set(artistsOf(l).map(a => canon("artist", a)))];
+const aliasHay = l => [].concat(l.venue ? aliasNames("venue", l.venue) : [], ...artistsOf(l).map(a => aliasNames("artist", a))).join("\n").toLowerCase();
 async function saveAliases(){
   try { localStorage.setItem(ALIAS_LS, JSON.stringify(aliases)); } catch(e){}
   if(typeof store !== "undefined" && store && store.putAlias){ try { await store.putAlias(aliases); } catch(e){} }
@@ -330,7 +332,7 @@ function bindAliasCard(rerender){
     const k = $("#alKind").value, t = norm(typed);
     if(!t) return [];
     const m = new Map();
-    lives.forEach(l => (k === "venue" ? (l.venue ? [l.venue] : []) : splitNames(l.artist)).forEach(n0 => { const n = n0; m.set(n, (m.get(n) || 0) + 1); }));
+    lives.forEach(l => (k === "venue" ? (l.venue ? [l.venue] : []) : artistsOf(l)).forEach(n0 => { const n = n0; m.set(n, (m.get(n) || 0) + 1); }));
     return [...m].filter(([n]) => n !== typed.trim() && norm(n).startsWith(t)).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([name]) => ({name}));
   };
   [["#alOld", "old"], ["#alNew", "new"]].forEach(([id, field]) => $(id).addEventListener("input", e => showSugg(e.target, cands(field, e.target.value), c => { e.target.value = c.name; })));
@@ -532,7 +534,7 @@ async function extractFromImage(dataUrls, signal){
 {
  "genre":"ジャンル(音楽・舞台・お笑い・スポーツ・トーク・展示会・その他のいずれか。どれにも当てはまらない場合は「その他」、判断できなければ空文字)",
  "title":"公演名・イベント名・ツアー名",
- "artist":"出演者名(複数の場合は「、」で区切る)",
+ "artist":["出演者名(1人・1組ごとに配列の要素にする。名前の中にカンマや「、」を含む場合も分けず、1つの要素にする)"],
  "date":"開催日 YYYY-MM-DD(年が不明なら ${new Date().getFullYear()} とみなす)",
  "venue":"会場名",
  "pref":"会場がある都道府県名(例: 東京都、大阪府、北海道)。会場名や記載から確実に分かる場合のみ。分からなければ空文字",
@@ -774,7 +776,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.4.2</div>
+    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.5.0</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
@@ -805,7 +807,7 @@ function renderSettings(){
 async function shareOrDownload(blob, name){
   const file = new File([blob], name, {type: blob.type});
   if(navigator.canShare && navigator.canShare({files: [file]})){
-    try { await navigator.share({files: [file], title: name}); return true; } catch(e){ if(e.name === "AbortError") return false; }
+    try { await navigator.share({files: [file]}); return true; } catch(e){ if(e.name === "AbortError") return false; }
   }
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -831,8 +833,9 @@ const isEmptyVal = v => v === "" || v == null;
 function mergeFill(ex, o){
   const m = {...ex}; let ch = false;
   FIELDS.forEach(k => { if(k !== "genre" && isEmptyVal(ex[k]) && !isEmptyVal(o[k])){ m[k] = o[k]; ch = true; } });
+  if(m.artist !== ex.artist){ if(Array.isArray(o.artists)) m.artists = o.artists; else delete m.artists; }
   if(o.artistRoles){
-    const rr = {...(ex.artistRoles || {})}, names = splitNames(m.artist);
+    const rr = {...(ex.artistRoles || {})}, names = artistsOf(m);
     Object.keys(o.artistRoles).forEach(n => { if(!rr[n] && names.includes(n)){ rr[n] = o.artistRoles[n]; ch = true; } });
     if(Object.keys(rr).length) m.artistRoles = rr;
   }
@@ -859,6 +862,7 @@ async function importJSON(e){
       if(!r || typeof r !== "object") continue;
       const o = {id: String(r.id || uid()).replace(/[^A-Za-z0-9_\-.~:@+]/g, "_"), createdAt: Number(r.createdAt) || Date.now(), updatedAt: Date.now()};
       FIELDS.forEach(k => { o[k] = r[k] ?? ""; });
+      { const a = Array.isArray(r.artists) ? r.artists.map(x => String(x).trim()).filter(Boolean) : []; if(a.length){ o.artists = a; o.artist = a.join("、"); } }
       if(r.artistRoles && typeof r.artistRoles === "object" && !Array.isArray(r.artistRoles)) o.artistRoles = r.artistRoles;
       { const ph = photoList(r); if(ph.length) o.photos = ph; }
       o.pref = normPref(o.pref);
@@ -902,7 +906,7 @@ function openDetail(id){
       ${photoGalleryHtml(l)}<div class="a">${esc(l.title || l.artist || "(未入力)")}</div>
       <div class="m">${fmtDate(l.date)}${venueLabel(l) ? " ／ " + venueLinks(l) : ""}</div>
     </div>
-    ${(() => { const a = (l.artist || "").split("、").map(x => x.trim()).filter(Boolean); return a.length > 10 ? `<div class="field scroll"><small>出演者</small><div tabindex="0">${a.map(n => lkBtn("artist", n)).join("\n")}</div></div>` : (a.length ? `<div class="field"><small>出演者</small><div>${a.map(n => lkBtn("artist", n)).join("\n")}</div></div>` : ""); })()}
+    ${(() => { const a = artistsOf(l); return a.length > 10 ? `<div class="field scroll"><small>出演者</small><div tabindex="0">${a.map(n => lkBtn("artist", n)).join("\n")}</div></div>` : (a.length ? `<div class="field"><small>出演者</small><div>${a.map(n => lkBtn("artist", n)).join("\n")}</div></div>` : ""); })()}
     ${row(genreOf(l) === "スポーツ" ? "開場 ／ 開始" : "開場 ／ 開演", [l.open, l.start].filter(Boolean).map(fmtTime).join(" ／ "))}
     ${row("席種・券種", l.seatType)}
     ${row("座席・整理番号", l.seat)}
@@ -994,7 +998,7 @@ function regCands(kind, typed, skipNames){
   if(!t) return [];
   const m = new Map();
   lives.forEach(l => {
-    const names = kind === "venue" ? (l.venue ? [l.venue] : []) : (l.artist || "").split(/[、,，]/).map(x => x.trim()).filter(Boolean);
+    const names = kind === "venue" ? (l.venue ? [l.venue] : []) : artistsOf(l);
     names.forEach(n0 => { const n = canon(kind, n0); const o = m.get(n) || {name: n, n: 0, pref: ""}; o.n++; if(kind === "venue" && l.pref) o.pref = l.pref; m.set(n, o); });
   });
   return [...m.values()].filter(o => o.name !== typed.trim() && !(skipNames || []).includes(o.name) && aliasNames(kind, o.name).some(x => norm(x).startsWith(t)))
@@ -1122,7 +1126,7 @@ function openForm(existing){
     ${existing ? `<button class="btn danger" id="del">削除</button>` : ""}
     <div class="bbar"><div class="bbar-in"><button class="btn sec" id="cancel">キャンセル</button><button class="btn" id="save">${existing ? "保存" : "登録"}</button></div></div>
   `;
-  artistRows(splitArtists(l.artist).map(n => ({name: n, role: (l.artistRoles || {})[n] || ""})));
+  artistRows(artistsOf(l).map(n => ({name: n, role: (l.artistRoles || {})[n] || ""})));
   /* 会場名から都道府県を決める: 登録済みの記録 → Geminiで推定(未選択のときだけ) */
   let prefSeq = 0;
   const inferPref = async () => {
@@ -1327,7 +1331,7 @@ ${RULES}`;
     l.tags = splitTags(l.tags).join("、");
     l.genre = $("#f_genre").value || "音楽";
     l.title = l.title.replace(/\s*\n\s*/g, " ");
-    l.artist = readArtists().filter(Boolean).join("、");
+    l.artists = readArtists().filter(Boolean); l.artist = l.artists.join("、");
     { const rr = {}; readRows().forEach(r => { if(r.name && r.role) rr[r.name] = r.role; }); l.artistRoles = rr; }
     if(!l.artist && !l.title){ alert("公演名か出演者を入力してください"); return; }
     l.price = l.price === "" ? "" : Number(l.price);
@@ -1353,7 +1357,7 @@ const BPROMPT = () => `この画像はライブ・コンサートなどのイベ
 {
  "genre":"ジャンル(音楽・舞台・お笑い・スポーツ・トーク・展示会・その他のいずれか。どれにも当てはまらない場合は「その他」、判断できなければ空文字)",
  "title":"公演名・イベント名・ツアー名",
- "artist":"出演者名(複数の場合は「、」で区切る)",
+ "artist":["出演者名(1人・1組ごとに配列の要素にする。名前の中にカンマや「、」を含む場合も分けず、1つの要素にする)"],
  "venue":"会場名",
  "pref":"会場がある都道府県名(例: 東京都、大阪府、北海道)。会場名や記載から確実に分かる場合のみ。分からなければ空文字",
  "date":"開催日 YYYY-MM-DD(年が不明なら ${new Date().getFullYear()} とみなす)",
@@ -1369,13 +1373,14 @@ function bNormalize(r){
   f.genre = GENRES.includes(s(r.genre)) ? s(r.genre) : "";
   f.title = s(r.title);
   f.artist = Array.isArray(r.artist) ? r.artist.map(s).filter(Boolean).join("、") : s(r.artist).replace(/\s*[,，\/／]\s*/g, "、");
+  f.artists = Array.isArray(r.artist) ? r.artist.map(s).filter(Boolean) : null;
   f.venue = s(r.venue);
   f.pref = normPref(s(r.pref));
   const d = /^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/.exec(s(r.date)); f.date = d ? `${d[1]}-${d[2].padStart(2, "0")}-${d[3].padStart(2, "0")}` : "";
   const tm = v => { const m = /^(\d{1,2}):(\d{2})/.exec(s(v)); return m ? `${m[1].padStart(2, "0")}:${m[2]}` : ""; };
   f.open = tm(r.open); f.start = tm(r.start);
   if(f.genre === "展示会"){ f.open = ""; f.start = ""; }
-  if(f.genre === "スポーツ") f.artist = "";
+  if(f.genre === "スポーツ"){ f.artist = ""; f.artists = null; }
   f.seatType = s(r.seatType); f.seat = s(r.seat);
   f.price = String(s(r.price)).replace(/[^\d]/g, "");
   return f;
@@ -1572,6 +1577,7 @@ async function bRegister(){
   for(const it of targets){
     const f = it.f, now = Date.now();
     const rec = {id: uid(), genre: GENRES.includes(f.genre) ? f.genre : "音楽", title: f.title, artist: f.artist, venue: f.venue, pref: f.pref, date: f.date, open: f.open, start: f.start, seatType: f.seatType, seat: f.seat, price: f.price === "" ? "" : Number(f.price), setlist: "", artistRoles: {}, createdAt: now, updatedAt: now};
+    { const arr = Array.isArray(f.artists) && f.artists.join("、") === f.artist ? f.artists : splitNames(f.artist); if(arr.length) rec.artists = arr; } /* 画面で書き換えていなければ、読み取った配列のまま保存 */
     if(!rec.artist && !rec.title){ fail++; it.err = "公演名か出演者を入力してください。"; it.open = true; continue; }
     try { await dbPut(rec); n++; bItems = bItems.filter(x => x !== it); if(bMedia[it.id]){ URL.revokeObjectURL(bMedia[it.id].url); delete bMedia[it.id]; } }
     catch(e){ fail++; it.err = "登録できませんでした。"; it.open = true; }
