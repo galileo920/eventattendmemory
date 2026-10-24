@@ -309,6 +309,8 @@ const aliasNames = (kind, name) => { const c = canon(kind, name); return [c].con
 const splitNames = s => String(s || "").split(/[、,，]/).map(x => x.trim()).filter(Boolean);
 /* 出演者は配列(artists)で持つ。artist(文字列)は表示・検索・CSV用に「、」でつないだもの。古いデータ(artistsなし)は「、」で分けて読む */
 const artistsOf = l => Array.isArray(l && l.artists) ? l.artists.map(x => String(x).trim()).filter(Boolean) : splitNames(l && l.artist);
+/* artist が配列で保存されているデータは、artists に移して artist は「、」でつないだ文字列にそろえる */
+const normLive = l => { if(l && Array.isArray(l.artist)){ const a = l.artist.map(x => String(x).trim()).filter(Boolean); if(!Array.isArray(l.artists) || !l.artists.length) l.artists = a; l.artist = artistsOf({artists: l.artists}).join("、"); } return l; };
 const canonArtists = l => [...new Set(artistsOf(l).map(a => canon("artist", a)))];
 const aliasHay = l => [].concat(l.venue ? aliasNames("venue", l.venue) : [], ...artistsOf(l).map(a => aliasNames("artist", a))).join("\n").toLowerCase();
 async function saveAliases(){
@@ -574,7 +576,7 @@ function bindFilter(){
 }
 
 
-async function refresh(){ lives = await dbAll(); }
+async function refresh(){ lives = (await dbAll()).map(normLive); }
 
 const TABS = ["list", "stats", "settings"];
 const scrollPos = {};
@@ -861,7 +863,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.7.0</div>
+    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.7.1</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
@@ -947,7 +949,7 @@ async function importJSON(e){
       if(!r || typeof r !== "object") continue;
       const o = {id: String(r.id || uid()).replace(/[^A-Za-z0-9_\-.~:@+]/g, "_"), createdAt: Number(r.createdAt) || Date.now(), updatedAt: Date.now()};
       FIELDS.forEach(k => { o[k] = r[k] ?? ""; });
-      { const a = Array.isArray(r.artists) ? r.artists.map(x => String(x).trim()).filter(Boolean) : []; if(a.length){ o.artists = a; o.artist = a.join("、"); } }
+      { const a = (Array.isArray(r.artists) ? r.artists : Array.isArray(r.artist) ? r.artist : []).map(x => String(x).trim()).filter(Boolean); if(Array.isArray(o.artist)) o.artist = ""; if(a.length){ o.artists = a; o.artist = a.join("、"); } }
       if(r.artistRoles && typeof r.artistRoles === "object" && !Array.isArray(r.artistRoles)) o.artistRoles = r.artistRoles;
       { const ph = photoList(r); if(ph.length) o.photos = ph; }
       o.tags = tagsOf(r);
