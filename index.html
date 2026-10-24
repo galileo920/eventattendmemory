@@ -853,6 +853,8 @@ function renderSettings(){
       <label class="btn sec" style="text-align:center">バックアップファイルを読み込む
         <input id="import" type="file" accept="application/json,.json" style="display:none">
       </label>
+      <label style="display:flex;align-items:center;gap:8px;margin:10px 0 2px;font-size:15px"><input type="checkbox" id="exPhotos"${exPhotosOn() ? " checked" : ""}>バックアップにイベント画像を含める</label>
+      <div class="hint" style="margin:0 0 8px">オフにすると、画像を除いて書き出すので、ファイルが小さくなります(CSVには画像は入りません)。</div>
       <button class="btn sec" id="export">バックアップファイルを書き出す</button>
       <button class="btn sec" id="csv">CSVファイルを書き出す</button>
       <div class="status" id="dst"></div>
@@ -863,7 +865,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.7.2</div>
+    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.8.0</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
@@ -880,6 +882,7 @@ function renderSettings(){
   };
   if(dataMsg){ const d = $(dataMsg.id || "#dst"); d.className = "status " + dataMsg.cls; d.textContent = dataMsg.text; }
   bindAliasCard(renderSettings);
+  $("#exPhotos").onchange = e => { try { localStorage.setItem("livelog_exphotos", e.target.checked ? "1" : "0"); } catch(err){} };
   $("#export").onclick = exportJSON;
   $("#csv").onclick = exportCSV;
   $("#import").addEventListener("change", importJSON);
@@ -904,8 +907,11 @@ async function shareOrDownload(blob, name){
   return true;
 }
 function stamp(){ const d = new Date(), p = n => String(n).padStart(2, "0"); return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; }
+/* バックアップに画像を含めるか(選んだ内容は覚えておく) */
+const exPhotosOn = () => { try { return localStorage.getItem("livelog_exphotos") !== "0"; } catch(e){ return true; } };
+const backupLives = () => ($("#exPhotos") ? $("#exPhotos").checked : exPhotosOn()) ? lives : lives.map(l => { const r = {...l}; delete r.photos; return r; });
 async function exportJSON(){
-  const blob = new Blob([JSON.stringify({version: 2, lives, aliases}, null, 1)], {type: "application/json"});
+  const blob = new Blob([JSON.stringify({version: 2, lives: backupLives(), aliases}, null, 1)], {type: "application/json"});
   if(await shareOrDownload(blob, `eventlog_${stamp()}.json`)) setDataMsg("ok", "保存しました。");
 }
 async function exportCSV(){
