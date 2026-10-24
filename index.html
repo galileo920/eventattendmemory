@@ -859,7 +859,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.6.0</div>
+    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.6.1</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
@@ -979,10 +979,10 @@ function openDetail(id){
   closeDial();
   const l = lives.find(x => x.id === id);
   if(!l) return;
-  document.querySelector(".tabbar").hidden = false;
+  document.querySelector(".tabbar").hidden = true;
   saveScroll(); sub = true; subKind = "detail";
   window.scrollTo(0, 0);
-  $("#fab").style.display = "";
+  $("#fab").style.display = "none";
   const row = (k, v) => v ? `<div class="field"><small>${k}</small><div>${esc(v)}</div></div>` : "";
   $("#app").innerHTML = `
     <div class="ticket">
@@ -997,7 +997,7 @@ function openDetail(id){
     ${row("ジャンル", genreOf(l))}
     ${(() => { const t = String(l.setlist || "").trim(); return t ? `<div class="field"><small>詳細</small><div>${linkify(t)}</div></div>` : ""; })()}
     ${(() => { const g = splitTags(l.tags); return g.length ? `<div class="field"><small>タグ</small><div>${g.map(n => lkBtn("tag", n)).join("、")}</div></div>` : ""; })()}
-    <div class="bend"><button class="btn sec" id="back">戻る</button><button class="btn" id="edit">編集</button></div>
+    <div class="bbar"><div class="bbar-in"><button class="btn sec" id="back">戻る</button><button class="btn" id="edit">編集</button></div></div>
   `;
   bindPhotoGallery(l);
   $("#back").onclick = () => setTab("list");
