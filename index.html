@@ -853,9 +853,9 @@ function renderSettings(){
       <label class="btn sec" style="text-align:center">バックアップファイルを読み込む
         <input id="import" type="file" accept="application/json,.json" style="display:none">
       </label>
-      <label style="display:flex;align-items:center;gap:8px;margin:10px 0 2px;font-size:15px"><input type="checkbox" id="exPhotos" style="width:22px;height:22px;flex:none;margin:0"${exPhotosOn() ? " checked" : ""}><span>イベント画像を含める</span></label>
-      <div class="hint" style="margin:0 0 8px">オフにすると、画像を除いて書き出すので、ファイルが小さくなります(CSVには画像は入りません)。</div>
       <button class="btn sec" id="export">バックアップファイルを書き出す</button>
+      <label style="display:flex;align-items:center;gap:8px;margin:8px 0 2px;font-size:15px"><input type="checkbox" id="exPhotos" style="width:22px;height:22px;flex:none;margin:0"${exPhotosOn() ? " checked" : ""}><span>イベント画像を含めて書き出す</span></label>
+      <div class="hint" style="margin:0 0 8px">オフにすると、画像を除いて書き出すので、ファイルが小さくなります。</div>
       <button class="btn sec" id="csv">CSVファイルを書き出す</button>
       <div class="status" id="dst"></div>
     </div>
@@ -865,7 +865,7 @@ function renderSettings(){
       <button class="btn danger" id="wipe">全データを削除</button>
       <div class="status" id="wst"></div>
     </div>
-    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.8.1</div>
+    <div class="hint" style="text-align:center">イベント件数: ${lives.length} ／ Ver:1.8.2</div>
   `;
   /* 保存したあとは入力欄をロックし、「編集」を押したときだけ変更できる */
   let setLocked = !!s.apiKey;
